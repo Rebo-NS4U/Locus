@@ -1,0 +1,35 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' qrc:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'none'">
+<link rel="stylesheet" href="leaflet.css"><style>
+html,body,#map{height:100%;margin:0;background:var(--bg,#423429)}
+#notice{position:absolute;z-index:1000;bottom:30px;left:10px;background:var(--surface,#46372a);color:var(--text,#efdfd6);padding:8px;border-radius:6px;font:14px sans-serif}
+.night .leaflet-tile{filter:invert(1) hue-rotate(175deg) saturate(.35) sepia(.5) brightness(.82)}
+.leaflet-control-zoom a,.leaflet-control-attribution,.leaflet-tooltip{background:var(--surface,#46372a)!important;color:var(--text,#efdfd6)!important;border-color:var(--border,#70543d)!important}
+.leaflet-control-attribution a{color:var(--accent,#ffb77e)}
+.route-stop{display:grid;place-items:center;background:var(--accent,#ffb77e);color:var(--on_accent,#4d2600);border:2px solid var(--bg,#423429);border-radius:50%;font:600 13px sans-serif;box-sizing:border-box}
+.route-bend{background:var(--text,#efdfd6);border:3px solid var(--bg,#423429);border-radius:3px;box-sizing:border-box;box-shadow:0 0 0 1px var(--accent,#ffb77e)}
+/* Frosted map furniture keeps the map crisp beneath translucent controls. */
+html { border-radius: 18px; overflow: hidden; }
+.leaflet-container { font: 13px "Noto Sans", sans-serif; }
+.leaflet-top .leaflet-control { margin-top: 18px; }
+.leaflet-left .leaflet-control { margin-left: 18px; }
+.leaflet-control-zoom { border: 1px solid var(--border)!important; border-radius: 16px!important; overflow: hidden; box-shadow: 0 6px 24px #0003!important; }
+.leaflet-control-zoom a { width: 36px!important; height: 36px!important; line-height: 36px!important; border: 0!important; }
+.leaflet-control-zoom a:hover { color: var(--accent)!important; }
+.leaflet-control-zoom a,.leaflet-control-attribution,.leaflet-tooltip,#notice {
+  background: color-mix(in srgb,var(--surface) 78%,transparent)!important;
+  backdrop-filter: blur(18px) saturate(1.15);
+}
+.leaflet-control-attribution { border-radius: 12px 0 0 0; padding: 5px 10px!important; }
+.leaflet-tooltip { border-radius: 12px; padding: 8px 12px; box-shadow: 0 4px 18px #0003; }
+#notice { left: 18px; bottom: 40px; max-width: calc(100% - 60px); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; }
+/* Match every overlay to the native application's desktop font. */
+.leaflet-container, .leaflet-container *, #notice {
+  font-family: var(--font-family, "Noto Sans"), sans-serif !important;
+  font-size: var(--font-size, 11pt) !important;
+  font-weight: 400 !important;
+}
+</style>
+</head><body><div id="map"></div><div id="notice" hidden>Map tiles unavailable. Coordinate entry still works.</div>
+<script src="leaflet.js"></script><script src="qrc:///qtwebchannel/qwebchannel.js"></script><script src="map.js"></script></body></html>

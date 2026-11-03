@@ -8,3 +8,9 @@ Vendor/idevice-build/
 outputs/
 *.ipa
 Payload/
+linux/.venv/
+linux/*.egg-info/
+linux/build/
+linux/dist/
+__pycache__/
+*.pyc
