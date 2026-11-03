@@ -203,7 +203,8 @@ class Services:
                     speed_spec = {**spec, "profile": "offroad_walk"} if direct_walk else spec
                     await self.speed_metadata(option, speed_spec, url, overpass_url, include_stops)
                     try:
-                        self.anchor(option, start, end, max_gap=2 if profile["costing"] == "pedestrian" else 40)
+                        max_gap = float("inf") if spec["profile"].startswith("walk_") else (2 if profile["costing"] == "pedestrian" else 40)
+                        self.anchor(option, start, end, max_gap=max_gap)
                     except ValueError as error:
                         rejected.append(str(error))
                         continue
@@ -329,7 +330,7 @@ class Services:
         for point, anchor in ((option["points"][0], start), (option["points"][-1], end)):
             if distance(point, anchor) > max_gap:
                 if max_gap < 40:
-                    raise ValueError("Walking pins must be within 2 m of their mapped path. Move the pin onto the path; no cross-country connector will be added.")
+                    raise ValueError("Running pins must be within 2 m of their mapped path. Move the pin onto the path; no cross-country connector will be added.")
                 raise ValueError("A pin is more than 40 m from the mapped path. Move it, or choose a free off-road segment.")
         for first, anchor in ((True, start), (False, end)):
             index = 0 if first else -1
@@ -342,14 +343,14 @@ class Services:
                 option["connectors"].append([anchor, option["points"][0]])
                 option["points"].insert(0, anchor)
                 option["speeds"].insert(0, 1.4)
-                option["sources"].insert(0, "short pin connector")
+                option["sources"].insert(0, "pin connector")
                 option["driving"].insert(0, False)
                 option['motorized'].insert(0, False)
             else:
                 option["connectors"].append([option["points"][-1], anchor])
                 option["points"].append(anchor)
                 option["speeds"].append(1.4)
-                option["sources"].append("short pin connector")
+                option["sources"].append("pin connector")
                 option["driving"].append(False)
                 option['motorized'].append(False)
 

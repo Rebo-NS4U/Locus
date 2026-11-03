@@ -38,7 +38,7 @@ window.setRoute = (points, stops, segments = [], selected = -1) => {
     const line = L.polyline(segment.points, {segmentColor: segment.color, color: segment.color, weight: index === selected ? 6 : 4, opacity: segment.ready ? 0.9 : 0.5, dashArray: segment.ready ? null : '6,8', bubblingMouseEvents: false}).addTo(routeLine);
     line.bindTooltip(`${index + 1} → ${index + 2} · ${segment.label}${segment.ready ? '' : ' · needs planning'}`);
     if (segments.length) line.on('click', () => { if (bridge) bridge.selectLeg(index); });
-    (segment.connectors || []).forEach(connector => L.polyline(connector, {segmentColor: '#efdfd6', color: '#efdfd6', weight: 4, dashArray: '3,5'}).bindTooltip('Short connector from pin to mapped path').addTo(routeLine));
+    (segment.connectors || []).forEach(connector => L.polyline(connector, {segmentColor: '#efdfd6', color: '#efdfd6', weight: 4, dashArray: '3,5'}).bindTooltip('Direct connector from pin to mapped path').addTo(routeLine));
     (segment.stops || []).forEach(stop => {
       const light = stop.kind === 'traffic_light';
       const label = light ? 'Mapped traffic light · simulated red/green' : 'Mapped stop sign · simulated 2–5 second stop';

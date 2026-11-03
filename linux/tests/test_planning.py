@@ -97,7 +97,7 @@ class MixedServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls[0]['costing_options']['pedestrian']['use_tracks'], 1)
         option = result[0][0]
         self.assertEqual(option['points'][0], (0, 0))
-        self.assertEqual(option['sources'][0], 'short pin connector')
+        self.assertEqual(option['sources'][0], 'pin connector')
         self.assertEqual(option['speeds'][1], 2)
         self.assertEqual(len(calls), 1)
 
@@ -136,14 +136,17 @@ class MixedServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(option['speeds'], [20 / 3.6])
         self.assertIn('estimate', option['sources'][0])
 
-    async def test_far_snapped_alternative_does_not_discard_good_path(self):
+    async def test_walking_alternatives_allow_distant_connectors_and_keep_good_path(self):
         good = [(0, 0), (0, .001)]
         def request(url, params):
             trip = lambda points: {'status': 0, 'legs': [{'shape': encode_shape(points)}], 'summary': {'time': 20}}
             return {'trip': trip(good), 'alternates': [{'trip': trip([(.1, 0), (.1, .001)])}]}
         options = (await Services(request).mixed_route([{'start': good[0], 'end': good[1], 'spec': {'profile': 'walk_sidewalks'}}]))[0]
-        self.assertEqual(len(options), 1)
+        self.assertEqual(len(options), 2)
         self.assertEqual(options[0]['points'], good)
+        self.assertEqual(options[1]['points'][0], good[0])
+        self.assertEqual(options[1]['points'][-1], good[-1])
+        self.assertEqual(len(options[1]['connectors']), 2)
 
     async def test_remote_snapping_cannot_silently_bridge_a_large_gap(self):
         option = candidate([(0, 0), (0, .01)])

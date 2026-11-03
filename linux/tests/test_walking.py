@@ -52,14 +52,22 @@ class WalkingTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, 'do not connect'):
             await Services(lambda *_: {'trip': trip}).route(self.points, 'Walk')
 
-    async def test_walking_rejects_shortcut_from_pin_to_other_bank(self):
-        async def route(*args):
-            return [{'points': self.points}]
-        service = Services()
-        service.route = route
-        with self.assertRaisesRegex(ValueError, 'within 2 m'):
-            await service.mixed_route([{'start': (0, .0001), 'end': self.points[-1],
-                                        'spec': {'profile': 'walk_sidewalks'}}])
+    async def test_walking_connects_single_off_path_stop_without_distance_limit(self):
+        for profile in ('walk_sidewalks', 'walk_trails'):
+            for offset in (.0001, .001, .1):
+                for first in (True, False):
+                    service = Services(lambda *_: {'trip': self.trip()})
+                    start = (0, offset) if first else self.points[0]
+                    end = (0, .002 + offset) if not first else self.points[-1]
+                    result = await service.mixed_route([{'start': start, 'end': end,
+                                                        'spec': {'profile': profile}}])
+                    option = result[0][0]
+                    expected = [start, *self.points] if first else [*self.points, end]
+                    self.assertEqual(option['points'], expected)
+                    self.assertEqual(len(option['speeds']), len(expected) - 1)
+                    self.assertEqual(len(option['motorized']), len(expected) - 1)
+                    self.assertEqual(len(option['connectors']), 1)
+                    self.assertEqual(option['speeds'][0 if first else -1], 1.4)
 
     async def test_two_off_path_walking_stops_connect_directly_with_bends(self):
         for profile in ('walk_sidewalks', 'walk_trails'):
@@ -86,9 +94,9 @@ class WalkingTests(unittest.IsolatedAsyncioTestCase):
         service.route = route
         result = await service.mixed_route([{'start': start, 'end': end,
                                             'spec': {'profile': 'walk_trails'}}])
-        self.assertEqual(len(result[0]), 1)
-        self.assertEqual(result[0][0]['points'], mapped)
-        self.assertNotIn('speed_warning', result[0][0])
+        self.assertEqual(len(result[0]), 2)
+        self.assertEqual(result[0][1]['points'], mapped)
+        self.assertNotIn('speed_warning', result[0][1])
 
     async def test_running_does_not_automatically_connect_off_path_stops(self):
         service = Services(lambda *_: {'trip': self.trip()})
