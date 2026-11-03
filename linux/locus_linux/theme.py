@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Follow the user's desktop palette, with a portable warm fallback."""
+"""Assistant panel inspired controls using the exported desktop palette."""
 import configparser
 import re
 from pathlib import Path
@@ -41,22 +41,58 @@ def apply_theme(app, colors=None):
     config.read(Path.home() / ".config/qt6ct/qt6ct.conf")
     font = config.get("Fonts", "general", fallback='"Noto Sans,11"').strip('"').split(",")
     app.setFont(QFont(font[0], int(font[1]) if len(font) > 1 and font[1].isdigit() else 11))
+    # The panel uses rounded surfaces and subdued accent-tinted focus fills.
+    # Derive interaction colors from the active export so wallpaper changes
+    # update every state together, including light palettes.
+    def mix(first, second, amount):
+        a, b = QColor(first), QColor(second)
+        return QColor(*(round(x * (1 - amount) + y * amount)
+                        for x, y in zip(a.getRgb()[:3], b.getRgb()[:3]))).name()
+
+    style = dict(c, hover=mix(c["surface"], c["accent"], .16),
+                 pressed=mix(c["surface"], c["accent"], .28),
+                 primary_hover=mix(c["accent"], c["text"], .12),
+                 disabled=mix(c["surface"], c["bg"], .5))
     app.setStyleSheet("""
         QMainWindow, QDialog { background: %(bg)s; color: %(text)s; }
-        QGroupBox { border: 1px solid %(border)s; border-radius: 12px; margin-top: 14px; padding: 16px 10px 10px; font-weight: 600; }
-        QGroupBox::title { subcontrol-origin: margin; left: 14px; padding: 0 5px; color: %(accent)s; }
-        QPushButton, QToolButton { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 7px; padding: 6px 9px; }
-        QPushButton:hover { background: %(raised)s; border-color: %(accent)s; }
-        QPushButton:pressed, QPushButton:checked { background: %(accent)s; color: %(on_accent)s; }
-        QPushButton:disabled { color: %(muted)s; }
-        QPushButton#primary { background: %(accent)s; color: %(on_accent)s; font-weight: 600; }
-        QLineEdit, QDoubleSpinBox, QComboBox, QListWidget { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 7px; padding: 5px; selection-background-color: %(accent)s; selection-color: %(on_accent)s; }
-        QTabWidget::pane { border: 0; } QTabBar::tab { padding: 10px 13px; border-bottom: 2px solid transparent; }
-        QTabBar::tab:selected { color: %(accent)s; border-bottom-color: %(accent)s; }
-        QLabel#subtitle { color: %(muted)s; } QLabel#status { background: %(surface)s; border-radius: 5px; padding: 3px 6px; font-size: 12px; }
-        QMenu { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; padding: 4px; }
-        QMenu::item { padding: 7px 18px; } QMenu::item:selected { background: %(raised)s; color: %(accent)s; }
+        QGroupBox { background: %(surface)s; border: 1px solid %(border)s; border-radius: 16px; margin-top: 16px; padding: 18px 12px 12px; font-weight: 600; }
+        QGroupBox::title { subcontrol-origin: margin; left: 16px; padding: 0 6px; color: %(accent)s; }
+        QPushButton, QToolButton { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 16px; min-height: 20px; padding: 7px 12px; }
+        QPushButton:hover, QToolButton:hover { background: %(hover)s; }
+        QPushButton:pressed, QToolButton:pressed { background: %(pressed)s; border-color: %(accent)s; }
+        QPushButton:checked, QToolButton:checked { background: %(accent)s; color: %(on_accent)s; border-color: %(accent)s; }
+        QPushButton:focus, QToolButton:focus { border: 1px solid %(accent)s; }
+        QPushButton#primary { background: %(accent)s; color: %(on_accent)s; border-color: %(accent)s; font-weight: 600; }
+        QPushButton#primary:hover, QPushButton:checked:hover, QToolButton:checked:hover { background: %(primary_hover)s; }
+        QPushButton#primary:pressed { background: %(primary_hover)s; border-color: %(text)s; }
+        QPushButton:disabled, QPushButton#primary:disabled, QToolButton:disabled { background: %(disabled)s; color: %(muted)s; border-color: %(border)s; }
+        QToolButton::menu-indicator { image: none; }
+        QLineEdit, QDoubleSpinBox, QSpinBox, QComboBox, QListWidget, QTextEdit, QPlainTextEdit { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 12px; padding: 6px; selection-background-color: %(accent)s; selection-color: %(on_accent)s; }
+        QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus, QComboBox:focus, QListWidget:focus { border-color: %(accent)s; }
+        QComboBox QAbstractItemView { background: %(surface)s; color: %(text)s; selection-background-color: %(accent)s; selection-color: %(on_accent)s; border: 1px solid %(border)s; }
+        QListWidget::item { padding: 6px; border-radius: 8px; }
+        QListWidget::item:hover { background: %(hover)s; }
+        QListWidget::item:selected { background: %(accent)s; color: %(on_accent)s; }
+        QTabWidget::pane { border: 0; }
+        QTabBar::tab { background: %(surface)s; color: %(muted)s; padding: 8px 12px; border: 1px solid transparent; border-radius: 12px; margin: 2px; }
+        QTabBar::tab:hover { background: %(hover)s; color: %(text)s; }
+        QTabBar::tab:selected { background: %(accent)s; color: %(on_accent)s; }
+        QCheckBox, QRadioButton { color: %(text)s; spacing: 8px; }
+        QCheckBox:disabled, QRadioButton:disabled { color: %(muted)s; }
+        QCheckBox::indicator, QRadioButton::indicator { width: 16px; height: 16px; border: 1px solid %(border)s; background: %(surface)s; }
+        QCheckBox::indicator { border-radius: 5px; }
+        QRadioButton::indicator { border-radius: 9px; }
+        QCheckBox::indicator:hover, QRadioButton::indicator:hover { border-color: %(accent)s; background: %(hover)s; }
+        QCheckBox::indicator:checked, QRadioButton::indicator:checked { background: %(accent)s; border: 4px solid %(on_accent)s; }
+        QCheckBox::indicator:disabled, QRadioButton::indicator:disabled { background: %(disabled)s; border-color: %(muted)s; }
+        QLabel#subtitle { color: %(muted)s; }
+        QLabel#status { background: %(surface)s; border-radius: 10px; padding: 4px 8px; font-size: 12px; }
+        QMenu { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 12px; padding: 6px; }
+        QMenu::item { padding: 7px 18px; border-radius: 8px; }
+        QMenu::item:selected { background: %(hover)s; color: %(text)s; }
+        QMenu::item:disabled { color: %(muted)s; }
+        QMenu::separator { height: 1px; background: %(border)s; margin: 5px 8px; }
         QToolTip { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; }
         QScrollArea { border: 0; } QSplitter::handle { background: %(bg)s; }
-    """ % c)
+    """ % style)
     return c

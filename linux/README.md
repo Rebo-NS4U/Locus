@@ -6,7 +6,9 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 
 ## Features
 
-- Desktop colors and font from Qt6ct, with a warm brown/peach fallback. Palette
+- Assistant panel inspired rounded buttons, accent selections, keyboard focus rings,
+  and matching cards, fields, tabs and menus. Desktop colors and font come from
+  Qt6ct, with a warm brown/peach fallback. Palette
   changes are picked up while the app stays open. Matching night and street maps.
 - Map-first layout: one compact action bar, a slim status line and a collapsible
   Controls sidebar (`Ctrl+B`), hidden by default. Coordinates, map display and the

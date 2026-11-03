@@ -250,7 +250,7 @@ class Window(QMainWindow):
         side = QVBoxLayout(sidebar)
         side.setContentsMargins(0, 0, 4, 0)
         self.tabs = QTabWidget()
-        self.tabs.setStyleSheet("QWidget { font-size: 13px; } QPushButton { padding: 6px 7px; } QTabBar::tab { padding: 7px 6px; }")
+        self.tabs.setStyleSheet("QWidget { font-size: 13px; } QTabBar::tab { padding: 7px 6px; }")
         for widget, title in [(self.places_tab(), "Places"), (self.route_tab(), "Route"),
                               (self.movement_tab(), "Move"), (self.map_tab(), "Map"), (self.settings_tab(), "Settings")]:
             self.tabs.addTab(widget, title)
