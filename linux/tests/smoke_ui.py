@@ -101,6 +101,18 @@ def check():
             window.worker.services.requester = fake_request
             window.map.page().runJavaScript("""
                 (() => {
+                    const fixture = {points: [[51.5, -.12], [51.501, -.121]], ready: true,
+                        color: palette.accent, label: 'Test road', stops: [
+                            {point: [51.5, -.12], kind: 'stop_sign'},
+                            {point: [51.501, -.121], kind: 'traffic_light'}]};
+                    setRoute([], [], [fixture]);
+                    const signs = routeLine.getLayers().filter(layer => layer instanceof L.Marker);
+                    const visibleSigns = signs.length === 2
+                        && signs[0].getElement().textContent === 'STOP'
+                        && signs[1].getElement().querySelectorAll('i').length === 3;
+                    setTheme(palette); // Theme updates must support icon markers, too.
+                    setRoute([], [], []);
+                    const signsCleared = signs.every(sign => !map.hasLayer(sign));
                     const zoom = map.getZoom();
                     const event = {latlng: L.latLng(51.5, -0.12)};
                     map.fire('click', event);
@@ -108,7 +120,7 @@ def check():
                     map.fire('dblclick', event);
                     const layers = [];
                     map.eachLayer(layer => layers.push(layer));
-                    return !map.doubleClickZoom.enabled() && map.getZoom() === zoom
+                    return visibleSigns && signsCleared && !map.doubleClickZoom.enabled() && map.getZoom() === zoom
                         && !layers.some(layer => layer instanceof L.CircleMarker);
                 })()
             """, gesture_results.append)

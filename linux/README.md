@@ -45,6 +45,8 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   with acceleration and braking toward turns/lower limits. Missing data is labeled
   as an estimate. Manual speed overrides are available per segment. This estimates
   simulated movement; it does not sense the phone's actual vehicle speed or live traffic.
+- Visible red STOP signs and traffic-light icons mark detected driving controls
+  on planned routes. Hover for the control type and simulated behavior.
 - Auto stops at mapped stop signs and lights, enabled by default. Signs get varied
   2–5 second pauses; each light has a configurable chance of simulated red (45%
   default), with 8–65 second waits. Driving brakes before the control and restarts

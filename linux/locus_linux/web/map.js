@@ -8,7 +8,7 @@ let palette = {accent: '#ffb77e', text: '#efdfd6', bg: '#423429'};
 window.setTheme = colors => {
   palette = colors;
   for (const [key, value] of Object.entries(colors)) document.documentElement.style.setProperty('--' + key, value);
-  if (routeLine) routeLine.eachLayer(layer => layer.setStyle({color: layer.options.segmentColor || palette.accent}));
+  if (routeLine) routeLine.eachLayer(layer => { if (layer.setStyle) layer.setStyle({color: layer.options.segmentColor || palette.accent}); });
 };
 window.setOptions = (night, shouldFollow) => {
   document.body.classList.toggle('night', night);
@@ -41,9 +41,13 @@ window.setRoute = (points, stops, segments = [], selected = -1) => {
     (segment.connectors || []).forEach(connector => L.polyline(connector, {segmentColor: '#efdfd6', color: '#efdfd6', weight: 4, dashArray: '3,5'}).bindTooltip('Short connector from pin to mapped path').addTo(routeLine));
     (segment.stops || []).forEach(stop => {
       const light = stop.kind === 'traffic_light';
-      const color = light ? '#ffb595' : '#dec56e';
-      L.circleMarker(stop.point, {radius: 5, weight: 2, color, segmentColor: color, fillColor: palette.bg, fillOpacity: 1})
-        .bindTooltip(light ? 'Mapped traffic light · simulated red/green' : 'Mapped stop sign').addTo(routeLine);
+      const label = light ? 'Mapped traffic light · simulated red/green' : 'Mapped stop sign · simulated 2–5 second stop';
+      const html = light
+        ? '<span class="traffic-light-sign" aria-label="Traffic light"><i></i><i></i><i></i></span>'
+        : '<span class="traffic-stop-sign" aria-label="Stop sign">STOP</span>';
+      L.marker(stop.point, {title: label, zIndexOffset: 500,
+        icon: L.divIcon({className: 'traffic-control', html, iconSize: [44, 44], iconAnchor: [22, 22]})})
+        .bindTooltip(label).addTo(routeLine);
     });
     if (index === selected) (segment.controls || []).forEach((point, bend) => {
       const handle = L.marker(point, {draggable: true, icon: L.divIcon({className: 'route-bend', html: '', iconSize: [14,14], iconAnchor: [7,7]})}).addTo(map);

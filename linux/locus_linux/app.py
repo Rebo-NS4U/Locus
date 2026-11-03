@@ -360,7 +360,7 @@ class Window(QMainWindow):
         self.follow.toggled.connect(self.map_options)
         group.addWidget(self.follow)
         self.button("Fit route", lambda: self.js("fitRoute()"), group)
-        legend = QLabel("Numbered pins mark route stops. The solid dot marks the last acknowledged command, not an independent GPS reading. Verify the result in Maps on your iPhone.")
+        legend = QLabel("Numbered pins mark route stops. Red STOP signs and traffic-light icons show detected driving controls after planning a mapped car route. Their tooltips describe the simulated stop. The solid dot marks the last acknowledged command, not an independent GPS reading. Verify the result in Maps on your iPhone.")
         legend.setWordWrap(True)
         legend.setObjectName("subtitle")
         box.addWidget(legend)

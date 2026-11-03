@@ -30,6 +30,16 @@ html { border-radius: 18px; overflow: hidden; }
   font-size: var(--font-size, 11pt) !important;
   font-weight: 400 !important;
 }
+.traffic-control { display: grid; place-items: center; filter: drop-shadow(0 2px 3px #0009); }
+.traffic-stop-sign { display: grid; place-items: center; width: 44px; height: 44px; box-sizing: border-box;
+  background: #b83232; color: #fff; border: 2px solid #fff;
+  clip-path: polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%); }
+.traffic-light-sign { display: grid; justify-items: center; gap: 3px; padding: 4px;
+  background: #202020; border: 2px solid #e9e1d8; border-radius: 6px; }
+.traffic-light-sign i { display: block; width: 8px; height: 8px; border-radius: 50%; }
+.traffic-light-sign i:nth-child(1) { background: #ff6961; }
+.traffic-light-sign i:nth-child(2) { background: #f2c94c; }
+.traffic-light-sign i:nth-child(3) { background: #6fcf97; }
 </style>
 </head><body><div id="map"></div><div id="notice" hidden>Map tiles unavailable. Coordinate entry still works.</div>
 <script src="leaflet.js"></script><script src="qrc:///qtwebchannel/qwebchannel.js"></script><script src="map.js"></script></body></html>

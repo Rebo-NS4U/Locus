@@ -132,6 +132,11 @@ These are simulated phases and approximate mapped stop locations, not live
 traffic, real vehicle sensing, or a guarantee that every intersection is covered.
 The phone still receives coordinates only; its apps may infer speed differently.
 
+Detected driving controls appear as red STOP signs and traffic-light icons on
+planned routes. Hover to see the control type and simulated behavior. The icons
+show mapped controls, not live light phases. Replan a mapped car route with
+Driving stops enabled to load controls; walking and free paths do not acquire them.
+
 ## Save, load and export
 
 **Save route project** writes an editable `.locus.json` file containing pins,
