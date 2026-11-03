@@ -64,7 +64,7 @@ result; it cannot silently replace the updated route.
   partitions its bends around the new pin. Reordering pins preserves settings on
   unchanged adjacent pairs; new pairs receive defaults.
 
-Limits: twelve main pins, ten intermediate bends per mapped segment, a thousand
+Limits: 99 main pins, ten intermediate bends per mapped segment, a thousand
 per free segment, and fifty thousand combined playback points. Walking stops
 connect directly to the mapped path without an endpoint distance limit, including
 when only one stop is off-path. For walking,

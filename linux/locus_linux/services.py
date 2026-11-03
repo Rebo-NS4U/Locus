@@ -166,9 +166,9 @@ class Services:
         return results
 
     async def mixed_route(self, legs, url=VALHALLA, overpass_url=OVERPASS, include_stops=True):
-        from .planning import specification, PROFILES
-        if not 1 <= len(legs) <= 11:
-            raise ValueError("A mixed route needs 2–12 main pins")
+        from .planning import specification, PROFILES, MAX_PINS
+        if not 1 <= len(legs) < MAX_PINS:
+            raise ValueError(f"A mixed route needs 2–{MAX_PINS} main pins")
         validated = []
         for leg in legs:
             spec = specification(leg["spec"])

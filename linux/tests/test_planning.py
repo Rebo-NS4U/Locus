@@ -18,6 +18,26 @@ def candidate(points, speed=5, driving=False):
 
 
 class DocumentTests(unittest.TestCase):
+    def test_99_pin_limit_for_add_insert_and_project_roundtrip(self):
+        plan = RoutePlan()
+        plan.reset([(0, i / 1000) for i in range(98)])
+        plan.insert(1, (.001, .0005))
+        self.assertEqual(len(plan.pins), 99)
+        restored = RoutePlan.deserialize(plan.serialize())
+        self.assertEqual(restored.requests(), plan.requests())
+        with self.assertRaisesRegex(ValueError, '99'):
+            plan.add((0, .1))
+        with self.assertRaisesRegex(ValueError, '99'):
+            plan.insert(1, (0, .1))
+        oversized = plan.serialize()
+        oversized['pins'].append({'point': (0, .1)})
+        oversized['legs'].append(specification())
+        with self.assertRaisesRegex(ValueError, '99'):
+            RoutePlan.deserialize(oversized)
+        plan = RoutePlan()
+        plan.reset([(0, i / 1000) for i in range(99)])
+        self.assertEqual(len(plan.pins), 99)
+
     def test_mixed_settings_survive_pin_drag_and_unaffected_legs_stay_ready(self):
         plan = RoutePlan()
         plan.reset([(0, 0), (0, .01), (0, .02), (0, .03)])
@@ -78,6 +98,19 @@ class DocumentTests(unittest.TestCase):
 
 
 class MixedServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_99_pin_route_plans_all_98_segments(self):
+        plan = RoutePlan()
+        plan.reset([(0, i / 1000) for i in range(99)])
+        for i in range(98):
+            plan.update(i, {'profile': 'offroad_walk'})
+        service = Services(lambda *_: self.fail('Free routes must stay offline'))
+        results = await service.mixed_route(plan.requests())
+        self.assertEqual(len(results), 98)
+        plan.accept(results, plan.revision)
+        self.assertEqual(len(plan.assemble()['points']), 99)
+        with self.assertRaisesRegex(ValueError, '99'):
+            await service.mixed_route(plan.requests() + [plan.requests()[-1]])
+
     async def test_free_path_is_offline_and_preserves_user_bends(self):
         def no_network(*args):
             raise AssertionError('Free routing must not request road data')
