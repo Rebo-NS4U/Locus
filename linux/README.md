@@ -33,6 +33,10 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 - Route planning keeps Plan, route files and playback pinned below the scrolling
   editor. Numbered stop/segment/shape sections group editing controls; the Route ⋯
   menu holds GPX, projects, free paths and clear actions.
+- Mapped walking/running excludes ferries, requires connected path geometry and
+  rejects pins more than two meters from their routed endpoint rather than adding
+  a cross-country shortcut. Use a mapped bridge to cross a river; disconnected
+  routes fail planning. Free paths, GPX and joystick remain unconstrained.
 - Up to twelve ordered/draggable pins with separate routing profiles between each
   pair: sidewalks, trails, running/cycling paths, roads, mapped dirt tracks, free
   walking paths and free driving paths. Each segment has its own bends, speed

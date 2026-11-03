@@ -122,24 +122,47 @@ class Services:
         costing = {"Walk": "pedestrian", "Run": "pedestrian", "Cycle": "bicycle", "Drive": "auto"}[mode]
         payload = {"locations": [{"lat": coordinates(*p)[0], "lon": coordinates(*p)[1]} for p in points],
                    "costing": costing, "units": "kilometers", "alternates": 2, "shape_format": "polyline6"}
-        if costing_options:
-            payload["costing_options"] = {costing: costing_options}
+        options = dict(costing_options or {})
+        if costing == "pedestrian":
+            options.update(use_ferry=0, exclude_ferries=True)
+            for location in payload["locations"]:
+                location["search_filter"] = {"exclude_ferry": True}
+        if options:
+            payload["costing_options"] = {costing: options}
         # The public demo expects compact JSON; form-encoded '+' whitespace
         # inside the json query is not decoded by all Valhalla frontends.
         response = await self.get(url, {"json": json.dumps(payload, separators=(",", ":"))})
         trips = [response.get("trip", {})] + [item.get("trip", {}) for item in response.get("alternates", [])]
         results = []
+        rejected = []
         for trip in trips:
             if trip.get("status") != 0:
                 continue
+            legs = trip.get("legs", [])
+            if costing == "pedestrian" and (
+                trip.get("summary", {}).get("has_ferry")
+                or any(leg.get("summary", {}).get("has_ferry")
+                       or any(m.get("ferry") or m.get("type") in (28, 29)
+                              or m.get("travel_type") == "ferry"
+                              for m in leg.get("maneuvers", [])) for leg in legs)
+            ):
+                rejected.append("Walking needs a connected footpath or bridge; ferry crossings are not walkable.")
+                continue
             shape = []
-            for leg in trip.get("legs", []):
+            for leg in legs:
                 decoded = decode_shape(leg["shape"])
+                if not decoded or (shape and distance(shape[-1], decoded[0]) > .5):
+                    rejected.append("Mapped route sections do not connect. Move the bend onto a connected path and plan again.")
+                    break
                 shape.extend(decoded if not shape else decoded[1:])
-            route = Route(shape)
-            results.append({"points": route.points, "distance": route.total, "seconds": trip["summary"]["time"]})
+            else:
+                route = Route(shape)
+                results.append({"points": route.points, "distance": route.total, "seconds": trip["summary"]["time"]})
+                continue
+            # Never draw a straight shortcut between disconnected leg shapes.
+            continue
         if not results:
-            raise ValueError(response.get("error", "No connected road route found. Try closer stops."))
+            raise ValueError(rejected[0] if rejected else response.get("error", "No connected road route found. Try closer stops."))
         return results
 
     async def mixed_route(self, legs, url=VALHALLA, overpass_url=OVERPASS, include_stops=True):
@@ -168,7 +191,7 @@ class Services:
                     option = copy.deepcopy(choice)
                     await self.speed_metadata(option, spec, url, overpass_url, include_stops)
                     try:
-                        self.anchor(option, start, end)
+                        self.anchor(option, start, end, max_gap=2 if profile["costing"] == "pedestrian" else 40)
                     except ValueError as error:
                         rejected.append(str(error))
                         continue
@@ -288,11 +311,13 @@ class Services:
         return roads + await objects('node', nodes)
 
     @staticmethod
-    def anchor(option, start, end):
+    def anchor(option, start, end, max_gap=40):
         option.setdefault('motorized', list(option.get('driving', [False] * (len(option['points']) - 1))))
         option["connectors"] = []
         for point, anchor in ((option["points"][0], start), (option["points"][-1], end)):
-            if distance(point, anchor) > 40:
+            if distance(point, anchor) > max_gap:
+                if max_gap < 40:
+                    raise ValueError("Walking pins must be within 2 m of their mapped path. Move the pin onto the path; no cross-country connector will be added.")
                 raise ValueError("A pin is more than 40 m from the mapped path. Move it, or choose a free off-road segment.")
         for first, anchor in ((True, start), (False, end)):
             index = 0 if first else -1

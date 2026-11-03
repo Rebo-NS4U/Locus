@@ -17,6 +17,12 @@ Select a segment in that list or click its colored line on the map.
 | Walk · free off-road path | Exact pin/bend geometry; no server request | 4.3 km/h estimate |
 | Car · free off-road path | Exact pin/bend geometry; no server request | 15 km/h estimate |
 
+Mapped walking/running requests exclude ferry edges and reject any returned
+ferry route, including ferries at an endpoint. River crossings must use connected
+mapped pedestrian paths (such as a foot-accessible bridge). Disconnected leg
+shapes are rejected rather than joined by an invented straight segment. If no
+connected route exists, planning fails instead of switching to a free path.
+
 Mapped modes are preferences, not guarantees of exclusively one terrain type.
 OpenStreetMap coverage and the routing engine determine what paths are available.
 Sidewalk tags sometimes describe a road rather than a separately drawn sidewalk;
@@ -45,10 +51,14 @@ result; it cannot silently replace the updated route.
   unchanged adjacent pairs; new pairs receive defaults.
 
 Limits: twelve main pins, ten intermediate bends per mapped segment, a thousand
-per free segment, and fifty thousand combined playback points. A mapped pin must
-be within forty meters of its routed endpoint. Short pin-to-path connectors are
-shown with light dashed lines and played at walking speed. Larger gaps are
-rejected; move the pin or explicitly choose a free off-road segment instead.
+per free segment, and fifty thousand combined playback points. Walking/running
+pins must be within two meters of their mapped endpoints; move an off-path pin
+onto the path rather than allowing a straight shortcut across a stream or bank.
+Other mapped modes retain a forty-meter endpoint limit. Tiny pin-to-path
+connectors are shown with light dashed lines and played at walking speed.
+This follows the router's mapped network; it does not independently survey water,
+closures or missing/incorrect map data. Explicit free paths, GPX and joystick
+movement keep their exact geometry and do not check water or barriers.
 
 ## Automatic driving speed
 
