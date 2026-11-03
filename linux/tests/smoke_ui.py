@@ -92,16 +92,13 @@ def check():
             assert window.map.width() >= window.width() * .95
             assert window.map.height() >= window.height() * .85
             collapsed_width = window.map.width()
-            window.sidebar_toggle.setChecked(True)
             window.worker.services.requester = fake_request
-            window.draw_stops.setChecked(True)
             window.map.page().runJavaScript("""
                 (() => {
                     const zoom = map.getZoom();
                     const event = {latlng: L.latLng(51.5, -0.12)};
-                    // A browser double-click emits two clicks before dblclick.
                     map.fire('click', event);
-                    map.fire('click', event);
+                    map.fire('click', {...event, originalEvent: {detail: 2}});
                     map.fire('dblclick', event);
                     const layers = [];
                     map.eachLayer(layer => layers.push(layer));
@@ -111,8 +108,11 @@ def check():
             """, gesture_results.append)
             stage = 1
         elif stage == 1 and len(window.stops) == 1 and gesture_results:
-            assert gesture_results == [True], 'Double-click must select coordinates without zooming or a preview circle'
-            assert window.worker.session.target is None, 'Double-click must only preview'
+            assert gesture_results == [True], 'One click must add one route pin without zooming or a preview circle'
+            assert window.worker.session.target is None, 'Map clicks must not apply phone location'
+            assert not window.sidebar_toggle.isChecked(), 'Pin placement must work with Controls hidden'
+            window.sidebar_toggle.setChecked(True)
+            app.processEvents()
             assert window.map.width() <= collapsed_width - 300
             tab_geometry = window.tabs.tabBar().geometry()
             map_geometry = window.map.geometry()
@@ -154,16 +154,16 @@ def check():
             app.processEvents()
             assert window.connection_badge.geometry() == badge_geometry
 
-            window.map.page().runJavaScript("map.fire('dblclick', {latlng: L.latLng(51.502, -0.122)})")
+            window.map.page().runJavaScript("map.fire('click', {latlng: L.latLng(51.502, -0.122)})")
             stage = 2
         elif stage == 2 and len(window.stops) == 2:
-            window.draw_stops.setChecked(False)
             window.search.setText('Westminster')
             window.search_places()
             stage = 3
         elif stage == 3 and not window.busy:
             assert window.results.count() == 1
             window.choose_place(window.results.item(0).data(Qt.ItemDataRole.UserRole))
+            assert len(window.stops) == 2, 'Search selection must not add a route pin'
             assert window.worker.session.target is None, 'Search selection must only preview'
             window.show_setup()
             assert window.setup_dialog.isVisible()
@@ -193,21 +193,21 @@ def check():
             assert window.sidebar_scroll.horizontalScrollBar().maximum() == 0, 'Sidebar must fit without horizontal clipping'
             window.segment_profile.setCurrentIndex(window.segment_profile.findData('car_roads'))
             window.draw_bends.setChecked(True)
-            window.map.page().runJavaScript("map.fire('dblclick', {latlng: L.latLng(51.5005, -0.1207)})")
+            window.map.page().runJavaScript("map.fire('click', {latlng: L.latLng(51.5005, -0.1207)})")
             stage = 40
         elif stage == 40 and len(window.route_plan.spec(0)['controls']) == 1:
             window.map.page().runJavaScript("bendMarkers[0].setLatLng([51.5006,-0.1206]); bendMarkers[0].fire('dragend')")
             stage = 41
         elif stage == 41 and all(abs(a - b) < 1e-8 for a, b in zip(window.route_plan.spec(0)['controls'][0], (51.5006, -.1206))):
             window.draw_bends.setChecked(False)
-            window.pick(51.501, -.121)
+            window.select_coordinates(51.501, -.121)
             window.stop_list.setCurrentRow(0)
             window.insert_stop()
             assert len(window.stops) == 3
             assert window.route_plan.spec(0)['profile'] == 'car_roads'
             window.segment_list.setCurrentRow(1)
             window.segment_profile.setCurrentIndex(window.segment_profile.findData('walk_trails'))
-            window.pick(51.503, -.123)
+            window.select_coordinates(51.503, -.123)
             window.add_stop()
             window.segment_list.setCurrentRow(2)
             window.segment_profile.setCurrentIndex(window.segment_profile.findData('offroad_car'))

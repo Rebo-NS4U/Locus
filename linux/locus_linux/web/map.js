@@ -71,9 +71,10 @@ window.fitRoute = () => {
 };
 new QWebChannel(qt.webChannelTransport, channel => {
   bridge = channel.objects.locus;
-  map.on('dblclick', event => {
+  map.on('click', event => {
+    // Ignore the second click of a native double-click.
+    if (event.originalEvent && event.originalEvent.detail > 1) return;
     const point = event.latlng.wrap();
-    focusLocation(point.lat, point.lng);
     channel.objects.locus.pick(point.lat, point.lng);
   });
 });
