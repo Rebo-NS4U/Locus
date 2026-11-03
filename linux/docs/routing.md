@@ -1,8 +1,12 @@
 # Mixed routing and automatic driving speed
 
 Open **Controls → Route**. Add two or more main pins using the preview pin or
-**Add map clicks as route stops**. Each pair appears in **Segments between pins**.
-Select a segment in that list or click its colored line on the map.
+**Add map clicks as route stops**. Stops and segments share one **Route stops & segments** list, with each segment
+between its two stops. Adding a stop selects the newest segment automatically;
+inserting a stop selects the new segment leading into it. Select a segment in
+the list or click its colored line on the map to edit its shape and speed.
+Selecting a stop edits its incoming segment (the first stop uses the first segment)
+and makes that stop the target for Insert, Remove and reorder controls.
 
 ## Per-segment route types
 

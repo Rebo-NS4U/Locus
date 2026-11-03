@@ -403,12 +403,13 @@ class Window(QMainWindow):
         box = QVBoxLayout(page)
         box.setContentsMargins(4, 0, 4, 4)
         box.setSpacing(6)
-        stops_box = self.group("1 · Route stops", box)
+        stops_box = self.group("Route stops & segments", box)
         stops_box.addWidget(QLabel("Click the map to add a route pin"))
-        self.stop_list = QListWidget()
-        self.stop_list.setFixedHeight(96)
-        self.stop_list.setToolTip("Select a stop to insert after it, remove it or change its order. Drag map pins to reposition them.")
-        stops_box.addWidget(self.stop_list)
+        self.route_list = QListWidget()
+        self.route_list.setFixedHeight(176)
+        self.route_list.setToolTip("Stops and their connecting segments in route order. Select a stop to insert, remove or reorder it; select a segment to edit its shape and speed.")
+        self.route_list.currentRowChanged.connect(lambda: self.select_segment(self.selected_segment()))
+        stops_box.addWidget(self.route_list)
         row = QHBoxLayout()
         for label, callback, tip in [
                 ("Add", self.add_stop, "Append the selected coordinates as a stop"),
@@ -425,13 +426,7 @@ class Window(QMainWindow):
             button.clicked.connect(lambda checked=False, step=direction: self.reorder_stop(step))
             row.addWidget(button)
         stops_box.addLayout(row)
-        box.addWidget(QLabel("2 · Select a segment"))
-        self.segment_list = QListWidget()
-        self.segment_list.setFixedHeight(80)
-        self.segment_list.setToolTip("Select a segment here or click its path on the map")
-        self.segment_list.currentRowChanged.connect(self.select_segment)
-        box.addWidget(self.segment_list)
-        self.segment_group = QGroupBox("3 · Shape & speed")
+        self.segment_group = QGroupBox("Shape & speed")
         editor = QVBoxLayout(self.segment_group)
         self.segment_profile = QComboBox()
         self.segment_profile.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
@@ -892,12 +887,12 @@ class Window(QMainWindow):
                 mode = self.travel_mode.currentText()
                 default = {"Drive": "car_roads", "Cycle": "cycle_paths", "Run": "run_paths"}.get(mode, "walk_sidewalks")
                 self.route_plan.add((self.latitude.value(), self.longitude.value()), default)
-                self.stops_changed()
+                self.stops_changed(select_newest=True)
             except ValueError as error:
                 self.status.setText(speed_text(str(error)))
 
     def remove_stop(self):
-        index = self.stop_list.currentRow()
+        index = self.selected_stop()
         if index >= 0 and self.editable_route():
             self.route_plan.remove(index)
             self.stops_changed()
@@ -905,12 +900,11 @@ class Window(QMainWindow):
     def insert_stop(self):
         if self.editable_route():
             try:
-                selected = self.stop_list.currentRow()
+                selected = self.selected_stop()
                 index = selected + 1 if selected >= 0 else len(self.stops)
                 default = {"Drive": "car_roads", "Cycle": "cycle_paths", "Run": "run_paths"}.get(self.travel_mode.currentText(), "walk_sidewalks")
                 self.route_plan.insert(index, (self.latitude.value(), self.longitude.value()), default)
-                self.stops_changed()
-                self.stop_list.setCurrentRow(index)
+                self.stops_changed(selected_row=max(0, 2 * index - 1))
             except ValueError as error:
                 self.status.setText(speed_text(str(error)))
 
@@ -927,34 +921,46 @@ class Window(QMainWindow):
                 self.status.setText(speed_text(str(error)))
 
     def reorder_stop(self, direction):
-        index, target = self.stop_list.currentRow(), self.stop_list.currentRow() + direction
+        index, target = self.selected_stop(), self.selected_stop() + direction
         if self.editable_route() and index >= 0 and 0 <= target < len(self.stops):
             self.route_plan.reorder(index, target)
             self.stops_changed()
-            self.stop_list.setCurrentRow(target)
+            self.route_list.setCurrentRow(2 * target)
 
     def clear_route(self):
         if self.editable_route():
             self.route_plan.reset([])
             self.stops_changed()
 
-    def stops_changed(self):
-        selected = max(0, self.segment_list.currentRow())
+    def selected_stop(self):
+        row = self.route_list.currentRow()
+        return row // 2 if row >= 0 else -1
+
+    def selected_segment(self):
+        row = self.route_list.currentRow()
+        if row < 0 or len(self.stops) < 2:
+            return -1
+        return max(0, (row - 1) // 2)
+
+    def stops_changed(self, *, select_newest=False, selected_row=None):
+        if selected_row is None:
+            selected_row = max(0, self.route_list.currentRow())
         self.stops = self.route_plan.points
         self.imported_track = False
-        self.stop_list.clear()
+        if select_newest:
+            selected_row = max(0, 2 * len(self.stops) - 3)
+        self.route_list.blockSignals(True)
+        self.route_list.clear()
         for i, point in enumerate(self.stops):
-            self.stop_list.addItem(f"{i + 1:02d}   {point[0]:.5f}, {point[1]:.5f}")
-        self.segment_list.blockSignals(True)
-        self.segment_list.clear()
-        for i in range(len(self.stops) - 1):
-            spec = self.route_plan.spec(i)
-            ready = bool(self.route_plan.results.get(self.route_plan.key(i)))
-            self.segment_list.addItem(f"{i + 1} → {i + 2} · {PROFILES[spec['profile']]['label']} · {'ready' if ready else 'needs plan'}")
-        if self.segment_list.count():
-            self.segment_list.setCurrentRow(min(selected, self.segment_list.count() - 1))
-        self.segment_list.blockSignals(False)
-        self.select_segment(self.segment_list.currentRow())
+            self.route_list.addItem(f"Stop {i + 1:02d}   {point[0]:.5f}, {point[1]:.5f}")
+            if i < len(self.stops) - 1:
+                spec = self.route_plan.spec(i)
+                ready = bool(self.route_plan.results.get(self.route_plan.key(i)))
+                self.route_list.addItem(f"    {i + 1} → {i + 2} · {PROFILES[spec['profile']]['label']} · {'ready' if ready else 'needs plan'}")
+        if self.route_list.count():
+            self.route_list.setCurrentRow(min(selected_row, self.route_list.count() - 1))
+        self.route_list.blockSignals(False)
+        self.select_segment(self.selected_segment())
         self.rebuild_route()
 
     def select_segment(self, index):
@@ -995,7 +1001,7 @@ class Window(QMainWindow):
         self.redraw_route()
 
     def update_segment(self, *unused):
-        index = self.segment_list.currentRow()
+        index = self.selected_segment()
         if self.segment_loading or index < 0:
             return
         if not self.editable_route():
@@ -1013,7 +1019,7 @@ class Window(QMainWindow):
             self.select_segment(index)
 
     def add_bend(self):
-        index = self.segment_list.currentRow()
+        index = self.selected_segment()
         if index < 0 or not self.editable_route():
             return
         spec = self.route_plan.spec(index)
@@ -1021,14 +1027,14 @@ class Window(QMainWindow):
         self.change_bends(index, spec)
 
     def undo_bend(self):
-        index = self.segment_list.currentRow()
+        index = self.selected_segment()
         if index >= 0 and self.editable_route():
             spec = self.route_plan.spec(index)
             spec["controls"] = spec["controls"][:-1]
             self.change_bends(index, spec)
 
     def clear_bends(self):
-        index = self.segment_list.currentRow()
+        index = self.selected_segment()
         if index >= 0 and self.editable_route():
             self.change_bends(index, {**self.route_plan.spec(index), "controls": []})
 
@@ -1061,10 +1067,10 @@ class Window(QMainWindow):
                 self.change_bends(segment, spec)
 
     def select_map_segment(self, index):
-        if 0 <= index < self.segment_list.count():
+        if 0 <= index < len(self.stops) - 1:
             self.sidebar_toggle.setChecked(True)
             self.tabs.setCurrentIndex(1)
-            self.segment_list.setCurrentRow(index)
+            self.route_list.setCurrentRow(2 * index + 1)
 
     def rebuild_route(self):
         self.route_points, self.route_profile = [], None
@@ -1078,7 +1084,7 @@ class Window(QMainWindow):
             self.redraw_route()
 
     def redraw_route(self):
-        self.js("setRoute", self.route_points, self.stops, [] if self.imported_track else self.route_plan.segments(), self.segment_list.currentRow())
+        self.js("setRoute", self.route_points, self.stops, [] if self.imported_track else self.route_plan.segments(), self.selected_segment())
 
     def use_drawn_route(self):
         if self.editable_route():
@@ -1101,7 +1107,7 @@ class Window(QMainWindow):
 
     def choose_route(self, index):
         if 0 <= index < len(self.alternatives) and self.editable_route():
-            segment = self.segment_list.currentRow()
+            segment = self.selected_segment()
             if segment >= 0:
                 self.route_plan.select(segment, index)
                 self.rebuild_route()

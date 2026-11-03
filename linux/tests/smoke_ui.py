@@ -224,15 +224,19 @@ def check():
         elif stage == 41 and all(abs(a - b) < 1e-8 for a, b in zip(window.route_plan.spec(0)['controls'][0], (51.5006, -.1206))):
             window.draw_bends.setChecked(False)
             window.select_coordinates(51.501, -.121)
-            window.stop_list.setCurrentRow(0)
+            window.route_list.setCurrentRow(0)
             window.insert_stop()
             assert len(window.stops) == 3
+            assert window.selected_segment() == 0
+            assert window.route_list.currentRow() == 1
+            assert window.route_list.count() == 5
             assert window.route_plan.spec(0)['profile'] == 'car_roads'
-            window.segment_list.setCurrentRow(1)
+            window.route_list.setCurrentRow(3)
             window.segment_profile.setCurrentIndex(window.segment_profile.findData('walk_trails'))
             window.select_coordinates(51.503, -.123)
             window.add_stop()
-            window.segment_list.setCurrentRow(2)
+            assert window.selected_segment() == 2
+            assert window.route_list.currentRow() == 5
             window.segment_profile.setCurrentIndex(window.segment_profile.findData('offroad_car'))
             window.segment_speed_mode.setCurrentIndex(window.segment_speed_mode.findData('manual'))
             window.segment_speed.setValue(12)
@@ -257,7 +261,7 @@ def check():
             window.plan_route()
             stage = 43
         elif stage == 43 and not window.busy:
-            window.segment_list.setCurrentRow(0)
+            window.route_list.setCurrentRow(1)
             assert window.route_options.count() == 2
             window.perform('prepare')
             before = len(window.stops)
