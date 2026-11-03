@@ -206,6 +206,7 @@ def check():
             assert window.segment_speed.suffix() == " mph"
             window.save_settings()
             assert abs(window.store.data['settings']['speed_kph'] - 23.4) < .01
+            window.segment_travel.setCurrentText('Cycling')
             window.plan_route()
             stage = 4
         elif stage == 4 and not window.busy:
@@ -216,7 +217,7 @@ def check():
             assert window.sidebar_scroll.horizontalScrollBar().maximum() == 0, 'Sidebar must fit without horizontal clipping'
             assert [window.segment_travel.itemText(i) for i in range(window.segment_travel.count())] == ['Walking', 'Driving', 'Cycling']
             window.segment_travel.setCurrentText('Walking')
-            assert window.route_plan.spec(0)['profile'] == 'walk_sidewalks'
+            assert window.route_plan.spec(0)['profile'] == 'walk_auto'
             window.segment_travel.setCurrentText('Cycling')
             assert window.route_plan.spec(0)['profile'] == 'cycle_paths'
             window.segment_travel.setCurrentText('Driving')
@@ -261,7 +262,7 @@ def check():
             assert project.exists()
             with patch.object(QFileDialog, 'getOpenFileName', return_value=(str(project), '')):
                 window.load_project()
-            assert [window.route_plan.spec(i)['profile'] for i in range(3)] == ['car_roads', 'walk_sidewalks', 'car_roads']
+            assert [window.route_plan.spec(i)['profile'] for i in range(3)] == ['car_roads', 'walk_auto', 'car_roads']
             window.save_settings()
             assert abs(window.store.data['settings']['speed_kph'] - 23.4) < .01
             window.plan_route()

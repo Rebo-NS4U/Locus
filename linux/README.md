@@ -34,10 +34,11 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   editor. Numbered stop/segment/shape sections group editing controls; the Route ⋯
   menu holds GPX, projects and clear actions.
 - Choose Walking, Driving or Cycling between each pair of up to 99 ordered,
-  draggable pins. The planner selects the appropriate mapped network. Each segment
+  draggable pins. Walking connects stops directly over legs of up to 300 metres (984 ft), including
+  bends; longer walking legs, Driving and Cycling use their mapped networks. Each segment
   keeps its own bends, speed policy and alternatives. Insert a pin to split a
   segment and inherit its settings. Existing route projects remain compatible.
-- Mapped walking excludes ferries and requires connected path geometry. Off-path
+- Longer mapped walking excludes ferries and requires connected path geometry. Off-path
   pins connect to that geometry without replacing the entire walking leg with a
   straight shortcut. Map coverage determines the available paths; use bends to
   guide a route or GPX for exact geometry.
@@ -128,8 +129,10 @@ Search, saved places and coordinate fields select coordinates without adding rou
 pins. Map clicks do not send phone commands. **Set location** sends it to the selected phone. Check the result in Maps.
 Use Move for joystick/imported-GPX speed controls. On Route, add or drag pins,
 choose **Walking**, **Driving** or **Cycling** for each segment, then **Plan segments**.
-The planner chooses mapped paths appropriate to the mode. Walking preserves the
-mapped path even when both pins need connectors. You can add bends to guide the
+Walking uses direct connections for legs up to 300 metres (984 ft), preserving
+any bends, so nearby stops do not detour onto roads. These connections do not
+check unmapped access or obstacles. Longer walking legs preserve mapped paths.
+Driving and Cycling use mapped roads and paths appropriate to their mode. You can add bends to guide the
 route or import GPX for exact geometry. Older projects retain their saved profiles. Explicitly choose **Start route** to apply movement to the phone.
 
 For Wi-Fi, first restore any active session, select USB and choose **Enable Wi-Fi

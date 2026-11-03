@@ -884,7 +884,7 @@ class Window(QMainWindow):
         if self.editable_route():
             try:
                 mode = self.travel_mode.currentText()
-                default = {"Drive": "car_roads", "Cycle": "cycle_paths", "Run": "run_paths"}.get(mode, "walk_sidewalks")
+                default = {"Drive": "car_roads", "Cycle": "cycle_paths", "Run": "run_paths"}.get(mode, "walk_auto")
                 self.route_plan.add((self.latitude.value(), self.longitude.value()), default)
                 self.stops_changed(select_newest=True)
             except ValueError as error:
@@ -901,7 +901,7 @@ class Window(QMainWindow):
             try:
                 selected = self.selected_stop()
                 index = selected + 1 if selected >= 0 else len(self.stops)
-                default = {"Drive": "car_roads", "Cycle": "cycle_paths", "Run": "run_paths"}.get(self.travel_mode.currentText(), "walk_sidewalks")
+                default = {"Drive": "car_roads", "Cycle": "cycle_paths", "Run": "run_paths"}.get(self.travel_mode.currentText(), "walk_auto")
                 self.route_plan.insert(index, (self.latitude.value(), self.longitude.value()), default)
                 self.stops_changed(selected_row=max(0, 2 * index - 1))
             except ValueError as error:

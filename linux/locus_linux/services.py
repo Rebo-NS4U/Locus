@@ -166,7 +166,7 @@ class Services:
         return results
 
     async def mixed_route(self, legs, url=VALHALLA, overpass_url=OVERPASS, include_stops=True):
-        from .planning import specification, PROFILES, MAX_PINS
+        from .planning import specification, PROFILES, MAX_PINS, SHORT_WALK_METRES
         if not 1 <= len(legs) < MAX_PINS:
             raise ValueError(f"A mixed route needs 2–{MAX_PINS} main pins")
         validated = []
@@ -180,7 +180,11 @@ class Services:
             profile = PROFILES[spec["profile"]]
             waypoints = [start, *spec["controls"], end]
             try:
-                if profile["costing"]:
+                short_walk = spec["profile"] == "walk_auto" and Route(waypoints).total <= SHORT_WALK_METRES
+                if short_walk:
+                    choices = [{"points": Route(waypoints).points,
+                                "speed_warning": "Direct short walking connection (unmapped access)."}]
+                elif profile["costing"]:
                     mode = {"auto": "Drive", "pedestrian": "Walk", "bicycle": "Cycle"}[profile["costing"]]
                     choices = await self.route(waypoints, mode, url, profile["options"])
                 else:

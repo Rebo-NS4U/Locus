@@ -7,6 +7,7 @@ from .engine import coordinates
 from .routes import Route, MAX_POINTS, distance
 
 MAX_PINS = 99
+SHORT_WALK_METRES = 300
 
 PROFILES = {
     "walk_sidewalks": {"label": "Walk · prefer sidewalks", "costing": "pedestrian", "speed": 5.04, "color": "#84d5c4", "options": {"sidewalk_factor": .4, "walkway_factor": .8, "use_tracks": 0, "max_hiking_difficulty": 0}},
@@ -18,6 +19,9 @@ PROFILES = {
     "offroad_car": {"label": "Car · free off-road path", "costing": None, "speed": 15, "color": "#ffb595", "options": {}},
     "cycle_paths": {"label": "Cycle · paths", "costing": "bicycle", "speed": 23.4, "color": "#cebdfe", "options": {"use_roads": .1}},
 }
+
+# Walking connects nearby stops without forcing them onto the road network.
+PROFILES["walk_auto"] = {**PROFILES["walk_sidewalks"], "label": "Walking"}
 
 # Keep existing profile IDs so saved projects retain their routing settings.
 PROFILES["run_roads"] = {**PROFILES["run_paths"], "label": "Run · prefer sidewalks", "options": {"walking_speed": 11.88, "sidewalk_factor": .4, "walkway_factor": .8, "use_tracks": 0, "max_hiking_difficulty": 0}}
@@ -32,7 +36,7 @@ TRAVEL_PATHS = {
 
 
 # Legacy profiles remain readable in saved projects; new edits need only a mode.
-TRAVEL_MODES = {"Walking": "walk_sidewalks", "Driving": "car_roads", "Cycling": "cycle_paths"}
+TRAVEL_MODES = {"Walking": "walk_auto", "Driving": "car_roads", "Cycling": "cycle_paths"}
 
 
 def travel_mode(profile):
@@ -44,7 +48,7 @@ def travel_mode(profile):
 
 
 
-def specification(value=None, default="walk_sidewalks"):
+def specification(value=None, default="walk_auto"):
     value = value or {}
     profile = value.get("profile", default)
     if profile not in PROFILES:
@@ -87,7 +91,7 @@ class RoutePlan:
         self.results = {k: v for k, v in self.results.items() if k in keys}
         self.selected = {k: v for k, v in self.selected.items() if k in keys}
 
-    def add(self, point, default="walk_sidewalks"):
+    def add(self, point, default="walk_auto"):
         if len(self.pins) >= MAX_PINS:
             raise ValueError(f"A route supports up to {MAX_PINS} main pins")
         self.pins.append({"id": uuid.uuid4().hex, "point": coordinates(*point)})
@@ -101,7 +105,7 @@ class RoutePlan:
             self.add(point)
         self.change()
 
-    def insert(self, index, point, default="walk_sidewalks"):
+    def insert(self, index, point, default="walk_auto"):
         if not 0 <= index <= len(self.pins) or len(self.pins) >= MAX_PINS:
             raise ValueError(f"Insert a pin within a route of at most {MAX_PINS} pins")
         point = coordinates(*point)
