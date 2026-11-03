@@ -6,10 +6,14 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 
 ## Features
 
-- Assistant panel inspired rounded buttons, accent selections, keyboard focus rings,
-  and matching cards, fields, tabs and menus. Desktop colors and font come from
+- Glass desktop redesign with a translucent rounded shell, inset action bar,
+  soft sidebar cards, pill controls, slim scrollbars and frosted map overlays.
+  Native window transparency uses the compositor’s background blur when enabled
+  (including Niri); map tiles and text stay crisp. Desktop colors and font come from
   Qt6ct, with a warm brown/peach fallback. Palette
   changes are picked up while the app stays open. Matching night and street maps.
+  UI code changes take effect on the next launch; an active phone session is never
+  restarted by installation. Without compositor blur, the tinted shell remains translucent.
 - Map-first layout: one compact action bar, a slim status line and a collapsible
   Controls sidebar (`Ctrl+B`), hidden by default. Coordinates, map display and the
   legend live in Controls → Map; scanning, preparation and setup are in the `⋯`

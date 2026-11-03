@@ -72,6 +72,12 @@ def check():
         if stage == 0 and loaded and not window.busy:
             assert window.devices.currentData() == 'demo'
             assert window.colors['accent'].startswith('#')
+            assert window.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+            # The shell must retain alpha for compositor blur, while controls
+            # and map content remain fully readable (no whole-window opacity).
+            assert window.centralWidget().objectName() == 'shell'
+            shell_pixel = window.grab().toImage().pixelColor(10, window.height() // 2)
+            assert 0 < shell_pixel.alpha() < 255, shell_pixel.getRgb()
             assert window.traffic_stops.isChecked()
             window.red_probability.setValue(100)
             assert not window.sidebar_scroll.isVisible()

@@ -128,6 +128,7 @@ class StatusLabel(QLabel):
 class Window(QMainWindow):
     def __init__(self, demo):
         super().__init__()
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.demo = demo
         self.colors = apply_theme(QApplication.instance())
         self.font_stamp = 0
@@ -197,13 +198,18 @@ class Window(QMainWindow):
 
     def build_ui(self):
         root = QWidget()
+        root.setObjectName("shell")
         layout = QVBoxLayout(root)
-        layout.setContentsMargins(8, 6, 8, 6)
-        layout.setSpacing(5)
-        header = QHBoxLayout()
-        header.setSpacing(6)
+        layout.setContentsMargins(14, 12, 14, 10)
+        layout.setSpacing(10)
+        toolbar = QWidget()
+        toolbar.setObjectName("toolbar")
+        header = QHBoxLayout(toolbar)
+        header.setContentsMargins(12, 8, 12, 8)
+        header.setSpacing(8)
         title = QLabel("Locus · Demo" if self.demo else "Locus")
-        title.setStyleSheet("font-size: 20px; font-weight: 700;")
+        title.setObjectName("brand")
+        title.setStyleSheet("font-size: 23px; font-weight: 700;")
         title.setToolTip("Locus for Linux" + (" · DEMO: no phone commands" if self.demo else ""))
         header.addWidget(title)
         self.sidebar_toggle = QPushButton("Controls")
@@ -244,11 +250,12 @@ class Window(QMainWindow):
         self.button("Set location", lambda: self.perform("apply"), header, True).setObjectName("primary")
         self.button("Hold", lambda: self.request("control", "hold"), header, True).setToolTip("Stop movement and hold the current simulated location")
         self.button("Restore", lambda: self.perform("restore"), header, True).setToolTip("Clear simulated location and close the phone connection")
-        layout.addLayout(header)
+        layout.addWidget(toolbar)
         split = QSplitter()
         self.split = split
-        split.setHandleWidth(4)
+        split.setHandleWidth(12)
         self.tabs = QTabWidget()
+        self.tabs.setObjectName("inspector")
         self.tabs.setMinimumWidth(360)
         self.tabs.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.tabs.setStyleSheet("QWidget { font-size: 13px; } QTabBar::tab { padding: 7px 6px; }")
@@ -260,6 +267,7 @@ class Window(QMainWindow):
             scroll.setWidgetResizable(True)
             scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
             scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            widget.setObjectName("inspectorPage")
             widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             scroll.setWidget(widget)
             self.tab_scrolls.append(scroll)
@@ -296,7 +304,10 @@ class Window(QMainWindow):
         split.setCollapsible(0, False)
         self.sidebar_toggle.toggled.connect(self.toggle_sidebar)
         layout.addWidget(split, 1)
-        footer = QHBoxLayout()
+        statusbar = QWidget()
+        statusbar.setObjectName("statusbar")
+        footer = QHBoxLayout(statusbar)
+        footer.setContentsMargins(10, 0, 10, 0)
         self.status = StatusLabel("Starting…")
         self.status.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.status.setMaximumHeight(26)
@@ -305,7 +316,7 @@ class Window(QMainWindow):
         footer.addWidget(self.status, 1)
         self.connection_badge.setStyleSheet("font-size: 12px;")
         footer.addWidget(self.connection_badge)
-        layout.addLayout(footer)
+        layout.addWidget(statusbar)
         self.setCentralWidget(root)
 
     @property

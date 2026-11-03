@@ -9,6 +9,21 @@ html,body,#map{height:100%;margin:0;background:var(--bg,#423429)}
 .leaflet-control-attribution a{color:var(--accent,#ffb77e)}
 .route-stop{display:grid;place-items:center;background:var(--accent,#ffb77e);color:var(--on_accent,#4d2600);border:2px solid var(--bg,#423429);border-radius:50%;font:600 13px sans-serif;box-sizing:border-box}
 .route-bend{background:var(--text,#efdfd6);border:3px solid var(--bg,#423429);border-radius:3px;box-sizing:border-box;box-shadow:0 0 0 1px var(--accent,#ffb77e)}
+/* Frosted map furniture keeps the map crisp beneath translucent controls. */
+html { border-radius: 18px; overflow: hidden; }
+.leaflet-container { font: 13px "Noto Sans", sans-serif; }
+.leaflet-top .leaflet-control { margin-top: 18px; }
+.leaflet-left .leaflet-control { margin-left: 18px; }
+.leaflet-control-zoom { border: 1px solid var(--border)!important; border-radius: 16px!important; overflow: hidden; box-shadow: 0 6px 24px #0003!important; }
+.leaflet-control-zoom a { width: 36px!important; height: 36px!important; line-height: 36px!important; border: 0!important; }
+.leaflet-control-zoom a:hover { color: var(--accent)!important; }
+.leaflet-control-zoom a,.leaflet-control-attribution,.leaflet-tooltip,#notice {
+  background: color-mix(in srgb,var(--surface) 78%,transparent)!important;
+  backdrop-filter: blur(18px) saturate(1.15);
+}
+.leaflet-control-attribution { border-radius: 12px 0 0 0; padding: 5px 10px!important; }
+.leaflet-tooltip { border-radius: 12px; padding: 8px 12px; box-shadow: 0 4px 18px #0003; }
+#notice { left: 18px; bottom: 40px; max-width: calc(100% - 60px); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; }
 </style>
 </head><body><div id="map"></div><div id="notice" hidden>Map tiles unavailable. Coordinate entry still works.</div>
 <script src="leaflet.js"></script><script src="qrc:///qtwebchannel/qwebchannel.js"></script><script src="map.js"></script></body></html>

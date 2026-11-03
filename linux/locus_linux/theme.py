@@ -49,15 +49,38 @@ def apply_theme(app, colors=None):
         return QColor(*(round(x * (1 - amount) + y * amount)
                         for x, y in zip(a.getRgb()[:3], b.getRgb()[:3]))).name()
 
-    style = dict(c, hover=mix(c["surface"], c["accent"], .16),
+    def alpha(key, opacity):
+        color = QColor(c[key])
+        return f"rgba({color.red()}, {color.green()}, {color.blue()}, {opacity})"
+
+    style = dict(c, glass=alpha("bg", 190), card=alpha("surface", 145),
+                 edge=alpha("text", 28), field=alpha("bg", 130),
+                 hover=mix(c["surface"], c["accent"], .16),
                  pressed=mix(c["surface"], c["accent"], .28),
                  primary_hover=mix(c["accent"], c["text"], .12),
                  disabled=mix(c["surface"], c["bg"], .5))
     app.setStyleSheet("""
-        QMainWindow, QDialog { background: %(bg)s; color: %(text)s; }
-        QGroupBox { background: %(surface)s; border: 1px solid %(border)s; border-radius: 16px; margin-top: 16px; padding: 18px 12px 12px; font-weight: 600; }
+        QMainWindow { background: transparent; color: %(text)s; }
+        QDialog { background: %(bg)s; color: %(text)s; }
+        QWidget#shell { background: %(glass)s; border: 1px solid %(edge)s; border-radius: 22px; }
+        QWidget#toolbar { background: %(card)s; border: 1px solid %(edge)s; border-radius: 18px; }
+        QWidget#statusbar { background: transparent; }
+        QLabel#brand { color: %(accent)s; padding: 0 8px 0 0; }
+        QTabWidget#inspector { background: %(card)s; border: 1px solid %(edge)s; border-radius: 18px; padding: 8px; }
+        QWidget#inspectorPage, QScrollArea, QScrollArea > QWidget > QWidget { background: transparent; }
+        QLabel { color: %(text)s; background: transparent; }
+        QScrollBar:vertical { background: transparent; width: 7px; margin: 4px 0; }
+        QScrollBar::handle:vertical { background: %(border)s; border-radius: 3px; min-height: 30px; }
+        QScrollBar::handle:vertical:hover { background: %(accent)s; }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+        QSlider::groove:horizontal { background: %(border)s; height: 4px; border-radius: 2px; }
+        QSlider::handle:horizontal { background: %(accent)s; width: 14px; margin: -5px 0; border-radius: 7px; }
+        QProgressBar { background: %(field)s; border: 0; border-radius: 6px; text-align: center; color: %(text)s; }
+        QProgressBar::chunk { background: %(accent)s; border-radius: 6px; }
+        QGroupBox { background: %(card)s; border: 1px solid %(edge)s; border-radius: 16px; margin-top: 16px; padding: 18px 12px 12px; font-weight: 600; }
         QGroupBox::title { subcontrol-origin: margin; left: 16px; padding: 0 6px; color: %(accent)s; }
-        QPushButton, QToolButton { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 16px; min-height: 20px; padding: 7px 12px; }
+        QPushButton, QToolButton { background: %(card)s; color: %(text)s; border: 1px solid %(edge)s; border-radius: 16px; min-height: 20px; padding: 7px 12px; }
         QPushButton:hover, QToolButton:hover { background: %(hover)s; }
         QPushButton:pressed, QToolButton:pressed { background: %(pressed)s; border-color: %(accent)s; }
         QPushButton:checked, QToolButton:checked { background: %(accent)s; color: %(on_accent)s; border-color: %(accent)s; }
@@ -67,14 +90,14 @@ def apply_theme(app, colors=None):
         QPushButton#primary:pressed { background: %(primary_hover)s; border-color: %(text)s; }
         QPushButton:disabled, QPushButton#primary:disabled, QToolButton:disabled { background: %(disabled)s; color: %(muted)s; border-color: %(border)s; }
         QToolButton::menu-indicator { image: none; }
-        QLineEdit, QDoubleSpinBox, QSpinBox, QComboBox, QListWidget, QTextEdit, QPlainTextEdit { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 12px; padding: 6px; selection-background-color: %(accent)s; selection-color: %(on_accent)s; }
+        QLineEdit, QDoubleSpinBox, QSpinBox, QComboBox, QListWidget, QTextEdit, QPlainTextEdit { background: %(field)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 12px; padding: 6px; selection-background-color: %(accent)s; selection-color: %(on_accent)s; }
         QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus, QComboBox:focus, QListWidget:focus { border-color: %(accent)s; }
         QComboBox QAbstractItemView { background: %(surface)s; color: %(text)s; selection-background-color: %(accent)s; selection-color: %(on_accent)s; border: 1px solid %(border)s; }
         QListWidget::item { padding: 6px; border-radius: 8px; }
         QListWidget::item:hover { background: %(hover)s; }
         QListWidget::item:selected { background: %(accent)s; color: %(on_accent)s; }
         QTabWidget::pane { border: 0; }
-        QTabBar::tab { background: %(surface)s; color: %(muted)s; padding: 8px 12px; border: 1px solid transparent; border-radius: 12px; margin: 2px; }
+        QTabBar::tab { background: transparent; color: %(muted)s; padding: 8px 12px; border: 1px solid transparent; border-radius: 12px; margin: 2px; }
         QTabBar::tab:hover { background: %(hover)s; color: %(text)s; }
         QTabBar::tab:selected { background: %(accent)s; color: %(on_accent)s; }
         QCheckBox, QRadioButton { color: %(text)s; spacing: 8px; }
@@ -86,13 +109,13 @@ def apply_theme(app, colors=None):
         QCheckBox::indicator:checked, QRadioButton::indicator:checked { background: %(accent)s; border: 4px solid %(on_accent)s; }
         QCheckBox::indicator:disabled, QRadioButton::indicator:disabled { background: %(disabled)s; border-color: %(muted)s; }
         QLabel#subtitle { color: %(muted)s; }
-        QLabel#status { background: %(surface)s; border-radius: 10px; padding: 4px 8px; font-size: 12px; }
+        QLabel#status { background: transparent; border-radius: 10px; padding: 4px 8px; font-size: 12px; }
         QMenu { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 12px; padding: 6px; }
         QMenu::item { padding: 7px 18px; border-radius: 8px; }
         QMenu::item:selected { background: %(hover)s; color: %(text)s; }
         QMenu::item:disabled { color: %(muted)s; }
         QMenu::separator { height: 1px; background: %(border)s; margin: 5px 8px; }
         QToolTip { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; }
-        QScrollArea { border: 0; } QSplitter::handle { background: %(bg)s; }
+        QScrollArea { border: 0; } QSplitter::handle { background: transparent; }
     """ % style)
     return c
