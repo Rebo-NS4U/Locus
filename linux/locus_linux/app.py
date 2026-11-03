@@ -98,8 +98,6 @@ class MapBridge(QObject):
     picked = Signal(float, float)
     stop_moved = Signal(int, float, float)
     segment_selected = Signal(int)
-    bend_moved = Signal(int, int, float, float)
-    bend_deleted = Signal(int, int)
 
     @Slot(float, float)
     def pick(self, latitude, longitude):
@@ -113,13 +111,6 @@ class MapBridge(QObject):
     def selectLeg(self, index):
         self.segment_selected.emit(index)
 
-    @Slot(int, int, float, float)
-    def moveBend(self, segment, bend, latitude, longitude):
-        self.bend_moved.emit(segment, bend, latitude, longitude)
-
-    @Slot(int, int)
-    def deleteBend(self, segment, bend):
-        self.bend_deleted.emit(segment, bend)
 
 
 class StatusLabel(QLabel):
@@ -296,8 +287,6 @@ class Window(QMainWindow):
         self.bridge.picked.connect(self.pick)
         self.bridge.stop_moved.connect(self.move_stop)
         self.bridge.segment_selected.connect(self.select_map_segment)
-        self.bridge.bend_moved.connect(self.move_bend)
-        self.bridge.bend_deleted.connect(self.delete_bend)
         self.channel.registerObject("locus", self.bridge)
         self.map.page().setWebChannel(self.channel)
         self.map.loadFinished.connect(self.map_ready)
@@ -426,7 +415,7 @@ class Window(QMainWindow):
             button.clicked.connect(lambda checked=False, step=direction: self.reorder_stop(step))
             row.addWidget(button)
         stops_box.addLayout(row)
-        self.segment_group = QGroupBox("Shape & speed")
+        self.segment_group = QGroupBox("Travel mode & speed")
         editor = QVBoxLayout(self.segment_group)
         editor.addWidget(QLabel("Travel mode"))
         self.segment_travel = QComboBox()
@@ -446,13 +435,6 @@ class Window(QMainWindow):
         self.segment_speed.setSuffix(" mph")
         speed_row.addWidget(self.segment_speed)
         editor.addLayout(speed_row)
-        self.draw_bends = QCheckBox("Map clicks add bends")
-        editor.addWidget(self.draw_bends)
-        bend_row = QHBoxLayout()
-        self.button("Add bend", self.add_bend, bend_row).setToolTip("Use the selected coordinates as an intermediate bend")
-        self.button("Undo", self.undo_bend, bend_row).setToolTip("Remove the last bend")
-        self.button("Clear", self.clear_bends, bend_row).setToolTip("Remove this segment's bends")
-        editor.addLayout(bend_row)
         self.segment_info = QLabel("Select a segment to edit its routing and speed.")
         self.segment_info.setWordWrap(True)
         editor.addWidget(self.segment_info)
@@ -467,7 +449,7 @@ class Window(QMainWindow):
         self.route_options.setPlaceholderText("Plan to compare paths")
         self.route_options.setToolTip("Alternative paths for the selected segment")
         editor.addWidget(self.route_options)
-        note = QLabel("Drag pins and bends on the map, then replan. Free paths follow bends exactly.")
+        note = QLabel("Add or drag stops and choose Walking, Driving or Cycling. Paths are chosen automatically.")
         note.setWordWrap(True)
         note.setObjectName("subtitle")
         box.addWidget(note)
@@ -479,7 +461,7 @@ class Window(QMainWindow):
         row = QHBoxLayout()
         self.plan_button = self.button("Plan route", self.plan_route, row)
         self.plan_button.setObjectName("primary")
-        self.plan_button.setToolTip("Plan all segments using their profiles, bends and speed settings")
+        self.plan_button.setToolTip("Choose paths automatically for each segment’s travel mode")
         self.route_file_button = QToolButton()
         self.route_file_button.setText("Route ⋯")
         self.route_file_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -620,7 +602,7 @@ class Window(QMainWindow):
             ("1 · Connect and trust", "Connect your iPhone with a USB data cable, unlock it and accept Trust This Computer. Linux needs usbmuxd and libimobiledevice installed."),
             ("2 · Enable developer access", "Use iOS 17.4 or newer. Enable Developer Mode in Settings → Privacy & Security and restart if prompted. Scan, select the phone and choose Prepare iPhone. First preparation downloads Apple's developer image."),
             ("3 · Pick a location", "Click the map to add route pins. Search or enter coordinates to select a location. Set location applies it. Verify the result in Maps on the phone."),
-            ("4 · Move or connect wirelessly", "Use Move for the joystick. In Route, set a profile and Auto/manual speed for each pin-to-pin segment, add or drag bends, then Plan segments. Wi-Fi: restore first, enable it over USB, unplug and scan in Wi-Fi mode."),
+            ("4 · Move or connect wirelessly", "Use Move for the joystick. In Route, choose Walking, Driving or Cycling for each pin-to-pin segment, then Plan route. Wi-Fi: restore first, enable it over USB, unplug and scan in Wi-Fi mode."),
             ("5 · Restore before leaving", "Restore real location before disconnecting or quitting. If the connection drops, the location is unknown. Reconnect the same phone to restore; a phone restart may be needed if simulation stays stuck.")]:
             heading = QLabel(title)
             label = QLabel(body)
@@ -686,7 +668,7 @@ class Window(QMainWindow):
                 self.route_plan.accept(result, self.planning_revision)
                 self.stops_changed()
                 self.js("fitRoute()")
-                self.status.setText("Segments planned. Select a colored segment to change its profile, bends, speed or alternative.")
+                self.status.setText("Paths chosen automatically. Select a colored segment to change its travel mode.")
             except ValueError as error:
                 self.status.setText(speed_text(str(error)))
         elif operation == "set_mode":
@@ -786,10 +768,7 @@ class Window(QMainWindow):
 
     def pick(self, latitude, longitude):
         self.select_coordinates(latitude, longitude)
-        if self.draw_bends.isChecked():
-            self.add_bend()
-        else:
-            self.add_stop()
+        self.add_stop()
 
     def js(self, function, *args):
         self.map.page().runJavaScript(function if not args else function + "(" + ",".join(json.dumps(arg) for arg in args) + ")")
@@ -985,7 +964,7 @@ class Window(QMainWindow):
             for i, option in enumerate(self.alternatives):
                 self.route_options.addItem(f"Path {i + 1} · {option['distance'] / METRES_PER_MILE:.2f} mi · ~{option['seconds'] / 60:.1f} min")
             self.route_options.setCurrentIndex(self.route_plan.selected.get(key, 0))
-            text = f"{len(spec['controls'])} bends · "
+            text = "Automatic path · "
             if self.alternatives:
                 option = self.alternatives[self.route_plan.selected.get(key, 0)]
                 low, high = to_mph(min(option["speeds"]) * 3.6), to_mph(max(option["speeds"]) * 3.6)
@@ -1020,54 +999,6 @@ class Window(QMainWindow):
         except ValueError as error:
             self.status.setText(speed_text(str(error)))
             self.select_segment(index)
-
-    def add_bend(self):
-        index = self.selected_segment()
-        if index < 0 or not self.editable_route():
-            return
-        spec = self.route_plan.spec(index)
-        spec["controls"].append((self.latitude.value(), self.longitude.value()))
-        self.change_bends(index, spec)
-
-    def undo_bend(self):
-        index = self.selected_segment()
-        if index >= 0 and self.editable_route():
-            spec = self.route_plan.spec(index)
-            spec["controls"] = spec["controls"][:-1]
-            self.change_bends(index, spec)
-
-    def clear_bends(self):
-        index = self.selected_segment()
-        if index >= 0 and self.editable_route():
-            self.change_bends(index, {**self.route_plan.spec(index), "controls": []})
-
-    def move_bend(self, segment, bend, latitude, longitude):
-        from .engine import coordinates
-        if not self.editable_route():
-            self.redraw_route()
-            return
-        if 0 <= segment < len(self.stops) - 1:
-            spec = self.route_plan.spec(segment)
-            if 0 <= bend < len(spec["controls"]):
-                try:
-                    spec["controls"][bend] = coordinates(latitude, longitude)
-                    self.change_bends(segment, spec)
-                except ValueError as error:
-                    self.status.setText(speed_text(str(error)))
-
-    def change_bends(self, index, spec):
-        try:
-            self.route_plan.update(index, spec)
-            self.stops_changed()
-        except ValueError as error:
-            self.status.setText(speed_text(str(error)))
-
-    def delete_bend(self, segment, bend):
-        if self.editable_route() and 0 <= segment < len(self.stops) - 1:
-            spec = self.route_plan.spec(segment)
-            if 0 <= bend < len(spec["controls"]):
-                spec["controls"].pop(bend)
-                self.change_bends(segment, spec)
 
     def select_map_segment(self, index):
         if 0 <= index < len(self.stops) - 1:
@@ -1133,7 +1064,7 @@ class Window(QMainWindow):
             path, _ = QFileDialog.getSaveFileName(self, "Save editable route", "route.locus.json", "Locus route (*.locus.json)")
             if path:
                 Path(path).write_text(json.dumps(data, indent=2))
-                self.status.setText("Route project saved with segment profiles, bends and speed choices.")
+                self.status.setText("Route project saved with stops, travel modes and speed choices.")
         except (OSError, ValueError) as error:
             self.status.setText(speed_text(str(error)))
 
@@ -1146,6 +1077,9 @@ class Window(QMainWindow):
                 if Path(path).stat().st_size > 8_000_000:
                     raise ValueError("Route project is too large")
                 plan = RoutePlan.deserialize(json.loads(Path(path).read_text()))
+                # Old shape hints must not constrain automatic path selection.
+                for index in range(len(plan.pins) - 1):
+                    plan.update(index, {**plan.spec(index), "controls": []})
                 self.route_plan = plan
                 self.stops_changed()
                 self.status.setText("Route project loaded. Plan segments to rebuild the paths.")

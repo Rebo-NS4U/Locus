@@ -3,7 +3,7 @@ const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
 tiles.on('tileerror', () => { document.getElementById('notice').hidden = false; });
-let acknowledged, routeLine, bridge, stopMarkers = [], bendMarkers = [], follow = true;
+let acknowledged, routeLine, bridge, stopMarkers = [], follow = true;
 let palette = {accent: '#ffb77e', text: '#efdfd6', bg: '#423429'};
 window.setTheme = colors => {
   palette = colors;
@@ -32,8 +32,6 @@ window.setRoute = (points, stops, segments = [], selected = -1) => {
   if (routeLine) routeLine.remove();
   routeLine = L.featureGroup().addTo(map);
   const pieces = segments.length ? segments : [{points: points.length ? points : stops, ready: Boolean(points.length), color: palette.accent, controls: [], label: 'Route'}];
-  bendMarkers.forEach(item => item.remove());
-  bendMarkers = [];
   pieces.forEach((segment, index) => {
     const line = L.polyline(segment.points, {segmentColor: segment.color, color: segment.color, weight: index === selected ? 6 : 4, opacity: segment.ready ? 0.9 : 0.5, dashArray: segment.ready ? null : '6,8', bubblingMouseEvents: false}).addTo(routeLine);
     line.bindTooltip(`${index + 1} → ${index + 2} · ${segment.label}${segment.ready ? '' : ' · needs planning'}`);
@@ -49,16 +47,7 @@ window.setRoute = (points, stops, segments = [], selected = -1) => {
         icon: L.divIcon({className: 'traffic-control', html, iconSize: [44, 44], iconAnchor: [22, 22]})})
         .bindTooltip(label).addTo(routeLine);
     });
-    if (index === selected) (segment.controls || []).forEach((point, bend) => {
-      const handle = L.marker(point, {draggable: true, icon: L.divIcon({className: 'route-bend', html: '', iconSize: [14,14], iconAnchor: [7,7]})}).addTo(map);
-      handle.bindTooltip('Drag to reshape · right-click to remove bend');
-      handle.on('dragend', () => {
-        const moved = handle.getLatLng().wrap();
-        if (bridge) bridge.moveBend(index, bend, moved.lat, moved.lng);
-      });
-      handle.on('contextmenu', () => { if (bridge) bridge.deleteBend(index, bend); });
-      bendMarkers.push(handle);
-    });
+
   });
   stopMarkers.forEach(item => item.remove());
   stopMarkers = stops.map((point, index) => {

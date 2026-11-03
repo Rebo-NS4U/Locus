@@ -35,13 +35,12 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   menu holds GPX, projects and clear actions.
 - Choose Walking, Driving or Cycling between each pair of up to 99 ordered,
   draggable pins. Walking connects stops directly over legs of up to 300 metres (984 ft), including
-  bends; longer walking legs, Driving and Cycling use their mapped networks. Each segment
-  keeps its own bends, speed policy and alternatives. Insert a pin to split a
+  their stops; longer walking legs, Driving and Cycling use their mapped networks. Each segment
+  keeps its own travel mode, speed policy and alternatives. Insert a pin to split a
   segment and inherit its settings. Existing route projects remain compatible.
 - Longer mapped walking excludes ferries and requires connected path geometry. Off-path
   pins connect to that geometry without replacing the entire walking leg with a
-  straight shortcut. Map coverage determines the available paths; use bends to
-  guide a route or GPX for exact geometry.
+  straight shortcut. Map coverage determines the available mapped paths. GPX supports exact geometry.
 - Automatic driving speed from mapped road speeds/limits and surface information,
   with acceleration and braking toward turns/lower limits. Missing data is labeled
   as an estimate. Manual speed overrides are available per segment. This estimates
@@ -53,11 +52,11 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   default), with 8–65 second waits. Driving brakes before the control and restarts
   smoothly while fixed-location refresh continues through the wait. Signal phases
   and durations are simulated, not live traffic data.
-- Colored, clickable segments and draggable bend handles; right-click a bend to
-  remove it. Editable `.locus.json` route projects retain pins, profiles, bends and
-  speed settings. See the [mixed-routing guide](docs/routing.md).
-- Explicit drawn-path mode and GPX import/export for up to 50,000 points. They
-  follow their exact geometry, including off-road sections. GPX import accepts
+- Colored, clickable segments with automatic path selection. Editable
+  `.locus.json` projects retain stops, travel modes and speeds. Loading an older
+  project discards manual shape hints so routing is automatic.
+- GPX import/export for up to 50,000 points follows exact geometry, including
+  off-road sections. GPX import accepts
   one track segment or route at a time and rejects separated segments rather
   than drawing unexplained connecting lines.
 - Route start, pause, resume, hold, looping, distance progress and a moving marker
@@ -124,16 +123,15 @@ Developer Mode under Settings → Privacy & Security and restart if prompted.
 First preparation requires internet to fetch Apple's developer disk image.
 
 Single-click the map to add a numbered route pin; no drawing toggle is needed,
-even with Controls hidden. In bend editing mode, clicks add bends instead.
+even with Controls hidden. Paths between stops are chosen automatically.
 Search, saved places and coordinate fields select coordinates without adding route
 pins. Map clicks do not send phone commands. **Set location** sends it to the selected phone. Check the result in Maps.
 Use Move for joystick/imported-GPX speed controls. On Route, add or drag pins,
 choose **Walking**, **Driving** or **Cycling** for each segment, then **Plan segments**.
-Walking uses direct connections for legs up to 300 metres (984 ft), preserving
-any bends, so nearby stops do not detour onto roads. These connections do not
+Walking uses direct connections for legs up to 300 metres (984 ft),
+so nearby stops do not detour onto roads. These connections do not
 check unmapped access or obstacles. Longer walking legs preserve mapped paths.
-Driving and Cycling use mapped roads and paths appropriate to their mode. You can add bends to guide the
-route or import GPX for exact geometry. Older projects retain their saved profiles. Explicitly choose **Start route** to apply movement to the phone.
+Driving and Cycling use mapped roads and paths appropriate to their mode. You can import GPX for exact geometry. Older projects retain their saved profiles. Explicitly choose **Start route** to apply movement to the phone.
 
 For Wi-Fi, first restore any active session, select USB and choose **Enable Wi-Fi
 over USB**. It saves the trusted pairing and enables wireless connections. Unplug
@@ -167,7 +165,7 @@ with unresolved state.
 
 The map is local bundled Leaflet inside Qt WebEngine. There is no HTTP control
 server. Map views request OpenStreetMap tiles; submitted searches go to Photon;
-route planning sends selected stops/bends to Valhalla, and driving speed lookup
+route planning sends selected stops to Valhalla, and driving speed lookup
 sends planned route geometry to its trace-attributes endpoint. Driving-stop lookup
 sends road/node IDs to the OpenStreetMap read API for small segments, or to the
 configured Overpass server for larger/custom lookups. The services see

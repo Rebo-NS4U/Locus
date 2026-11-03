@@ -222,14 +222,8 @@ def check():
             assert window.route_plan.spec(0)['profile'] == 'cycle_paths'
             window.segment_travel.setCurrentText('Driving')
             assert window.route_plan.spec(0)['profile'] == 'car_roads'
-            window.draw_bends.setChecked(True)
-            window.map.page().runJavaScript("map.fire('click', {latlng: L.latLng(51.5005, -0.1207)})")
-            stage = 40
-        elif stage == 40 and len(window.route_plan.spec(0)['controls']) == 1:
-            window.map.page().runJavaScript("bendMarkers[0].setLatLng([51.5006,-0.1206]); bendMarkers[0].fire('dragend')")
-            stage = 41
-        elif stage == 41 and all(abs(a - b) < 1e-8 for a, b in zip(window.route_plan.spec(0)['controls'][0], (51.5006, -.1206))):
-            window.draw_bends.setChecked(False)
+            assert not hasattr(window, 'draw_bends')
+            assert not hasattr(window.bridge, 'moveBend')
             window.select_coordinates(51.501, -.121)
             window.route_list.setCurrentRow(0)
             window.insert_stop()
@@ -260,9 +254,15 @@ def check():
             with patch.object(QFileDialog, 'getSaveFileName', return_value=(str(project), '')):
                 window.save_project()
             assert project.exists()
+            # Legacy projects must not retain invisible manual shape constraints.
+            import json
+            legacy = json.loads(project.read_text())
+            legacy['legs'][0]['controls'] = [[51.51, -.13]]
+            project.write_text(json.dumps(legacy))
             with patch.object(QFileDialog, 'getOpenFileName', return_value=(str(project), '')):
                 window.load_project()
             assert [window.route_plan.spec(i)['profile'] for i in range(3)] == ['car_roads', 'walk_auto', 'car_roads']
+            assert all(not window.route_plan.spec(i)['controls'] for i in range(3))
             window.save_settings()
             assert abs(window.store.data['settings']['speed_kph'] - 23.4) < .01
             window.plan_route()
