@@ -74,8 +74,9 @@ any added bends. The segment details identify this direct connection. Automatic
 speed uses the off-road walking estimate; manual speed is preserved. This does
 not check terrain or barriers. Running retains its two-meter endpoint limit. Routing failures still report an error;
 use Walk → Free off-road for an explicit direct path without a mapped-route lookup.
-Cycling and driving retain a forty-meter endpoint limit. Pin-to-path
-connectors are shown with light dashed lines and played at walking speed.
+Cycling and driving also allow direct pin-to-path connectors without a distance
+limit. These connectors are walking links; the mapped portion keeps the selected
+cycling or driving speed. Pin-to-path connectors are shown with light dashed lines and played at walking speed.
 This follows the router's mapped network; it does not independently survey water,
 closures or missing/incorrect map data. Explicit free paths, GPX and joystick
 movement keep their exact geometry and do not check water or barriers.

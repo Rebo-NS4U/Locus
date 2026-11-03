@@ -181,6 +181,24 @@ class MixedServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(options[1]['points'][-1], good[-1])
         self.assertEqual(len(options[1]['connectors']), 2)
 
+    async def test_cycle_and_drive_allow_distant_walking_connectors(self):
+        mapped = [(0, 0), (0, .001)]
+        start, end = (.01, 0), mapped[-1]
+        for profile in ('cycle_paths', 'cycle_roads', 'car_roads', 'car_tracks'):
+            service = Services()
+            async def route(*args):
+                return [{'points': mapped.copy()}]
+            service.route = route
+            options = (await service.mixed_route([
+                {'start': start, 'end': end,
+                 'spec': {'profile': profile, 'speed_mode': 'manual', 'speed_kph': 18}}
+            ], include_stops=False))[0]
+            self.assertEqual(options[0]['points'], [start, *mapped])
+            self.assertEqual(options[0]['connectors'], [[start, mapped[0]]])
+            self.assertEqual(options[0]['speeds'], [1.4, 5])
+            self.assertEqual(options[0]['motorized'][0], False)
+            self.assertEqual(options[0]['driving'][0], False)
+
     async def test_remote_snapping_cannot_silently_bridge_a_large_gap(self):
         option = candidate([(0, 0), (0, .01)])
         with self.assertRaisesRegex(ValueError, '40 m'):

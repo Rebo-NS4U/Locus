@@ -203,7 +203,8 @@ class Services:
                     speed_spec = {**spec, "profile": "offroad_walk"} if direct_walk else spec
                     await self.speed_metadata(option, speed_spec, url, overpass_url, include_stops)
                     try:
-                        max_gap = float("inf") if spec["profile"].startswith("walk_") else (2 if profile["costing"] == "pedestrian" else 40)
+                        running = profile["costing"] == "pedestrian" and not spec["profile"].startswith("walk_")
+                        max_gap = 2 if running else float("inf")
                         self.anchor(option, start, end, max_gap=max_gap)
                     except ValueError as error:
                         rejected.append(str(error))
