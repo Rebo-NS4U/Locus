@@ -34,11 +34,11 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   editor. Numbered stop/segment/shape sections group editing controls; the Route ⋯
   menu holds GPX, projects and clear actions.
 - Choose Walking, Driving or Cycling between each pair of up to 99 ordered,
-  draggable pins. Walking connects stops directly over legs of up to 300 metres (984 ft), including
-  their stops; longer walking legs, Driving and Cycling use their mapped networks. Each segment
-  keeps its own travel mode, speed policy and alternatives. Insert a pin to split a
+  draggable pins. Walking prefers mapped sidewalks and trails. A direct connection
+  of up to 300 metres (984 ft) is used only when no mapped walking route is found.
+  Each segment keeps its own travel mode, speed policy and alternatives. Insert a pin to split a
   segment and inherit its settings. Existing route projects remain compatible.
-- Longer mapped walking excludes ferries and requires connected path geometry. Off-path
+- Mapped walking excludes ferries and requires connected path geometry. Off-path
   pins connect to that geometry without replacing the entire walking leg with a
   straight shortcut. Map coverage determines the available mapped paths. GPX supports exact geometry.
 - Automatic driving speed from mapped road speeds/limits and surface information,
@@ -127,11 +127,12 @@ even with Controls hidden. Paths between stops are chosen automatically.
 Search, saved places and coordinate fields select coordinates without adding route
 pins. Map clicks do not send phone commands. **Set location** sends it to the selected phone. Check the result in Maps.
 Use Move for joystick/imported-GPX speed controls. On Route, add or drag pins,
-choose **Walking**, **Driving** or **Cycling** for each segment, then **Plan segments**.
-Walking uses direct connections for legs up to 300 metres (984 ft),
-so nearby stops do not detour onto roads. These connections do not
-check unmapped access or obstacles. Longer walking legs preserve mapped paths.
-Driving and Cycling use mapped roads and paths appropriate to their mode. You can import GPX for exact geometry. Older projects retain their saved profiles. Explicitly choose **Start route** to apply movement to the phone.
+choose **Walking**, **Driving** or **Cycling** for each segment, then **Plan route**.
+Walking prefers mapped sidewalks and trails, including on short legs. When the
+router finds no walking connection, legs up to 300 metres (984 ft) can connect
+directly; the segment labels this fallback. Network errors, ferries and disconnected
+route geometry do not trigger shortcuts. Driving and Cycling use their mapped networks.
+You can import GPX for exact geometry. Older projects retain their saved profiles. Explicitly choose **Start route** to apply movement to the phone.
 
 For Wi-Fi, first restore any active session, select USB and choose **Enable Wi-Fi
 over USB**. It saves the trusted pairing and enables wireless connections. Unplug

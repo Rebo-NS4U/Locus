@@ -2,7 +2,7 @@
 import json
 import unittest
 
-from locus_linux.services import Services, encode_shape
+from locus_linux.services import Services, encode_shape, NoRouteFound
 
 
 class WalkingTests(unittest.IsolatedAsyncioTestCase):
@@ -12,9 +12,9 @@ class WalkingTests(unittest.IsolatedAsyncioTestCase):
         return {'status': 0, 'summary': {'time': 200},
                 'legs': [{'shape': encode_shape(self.points)}]}
 
-    async def test_short_walking_is_direct_offline_and_preserves_bends(self):
+    async def test_short_walk_falls_back_only_when_no_mapped_path_exists(self):
         def offline(*args):
-            self.fail('Short walking must not request a road route')
+            return {'error': 'No path could be found'}
         start, bend, end = (0, 0), (.0002, .001), (0, .002)
         option = (await Services(offline).mixed_route([{
             'start': start, 'end': end,
@@ -23,11 +23,12 @@ class WalkingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(option['points'], [start, bend, end])
         self.assertEqual(option['speeds'], [1.4, 1.4])
         self.assertFalse(any(option['motorized']))
-        self.assertIn('Direct short walking', option['speed_warning'])
+        self.assertIn('No mapped walking connection', option['speed_warning'])
 
     async def test_long_walk_and_other_modes_still_use_mapped_geometry(self):
         for profile, start, end in (
             ('walk_auto', (0, 0), (0, .004)),
+            ('walk_auto', (0, 0), (0, .002)),
             ('car_roads', (0, 0), (0, .002)),
             ('cycle_paths', (0, 0), (0, .002)),
         ):
@@ -52,6 +53,8 @@ class WalkingTests(unittest.IsolatedAsyncioTestCase):
         plan.update(1, {'profile': 'car_roads', 'speed_mode': 'manual', 'speed_kph': 18})
         service = Services()
         async def route(points, mode, *args):
+            if mode == 'Walk':
+                raise NoRouteFound('No mapped footpath')
             self.assertEqual(mode, 'Drive')
             return [{'points': [points[0], (.001, .005), points[-1]]}]
         service.route = route
@@ -60,6 +63,45 @@ class WalkingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(combined['points'], [(0, 0), (0, .001), (.001, .005), (0, .01)])
         self.assertEqual(combined['motorized'], [False, True, True])
         self.assertEqual(combined['speeds'], [1.4, 5, 5])
+
+    async def test_auto_walk_prefers_sidewalks_and_trails_even_for_short_legs(self):
+        calls = []
+        def request(url, params):
+            calls.append(json.loads(params['json']))
+            return {'trip': self.trip()}
+        option = (await Services(request).mixed_route([{
+            'start': self.points[0], 'end': self.points[-1],
+            'spec': {'profile': 'walk_auto'}
+        }]))[0][0]
+        self.assertEqual(option['points'], self.points)
+        self.assertNotIn('speed_warning', option)
+        options = calls[0]['costing_options']['pedestrian']
+        self.assertLess(options['sidewalk_factor'], 1)
+        self.assertLess(options['walkway_factor'], 1)
+        self.assertEqual(options['use_tracks'], 1)
+
+    async def test_auto_walk_does_not_shortcut_rejected_ferry_or_disconnected_path(self):
+        for bad in ('ferry', 'disconnected'):
+            trip = self.trip()
+            if bad == 'ferry':
+                trip['summary']['has_ferry'] = True
+            else:
+                trip['legs'] = [{'shape': encode_shape(self.points[:2])},
+                                {'shape': encode_shape(self.points[2:])}]
+            with self.assertRaises(ValueError):
+                await Services(lambda *_: {'trip': trip}).mixed_route([{
+                    'start': self.points[0], 'end': self.points[-1],
+                    'spec': {'profile': 'walk_auto'}
+                }])
+
+    async def test_auto_walk_does_not_convert_network_failure_to_direct_path(self):
+        def request(*args):
+            raise ConnectionError('offline')
+        with self.assertRaisesRegex(ValueError, 'offline'):
+            await Services(request).mixed_route([{
+                'start': self.points[0], 'end': self.points[-1],
+                'spec': {'profile': 'walk_auto'}
+            }])
 
     async def test_walking_and_running_request_foot_network_without_ferries(self):
         for mode in ('Walk', 'Run'):

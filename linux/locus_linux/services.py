@@ -14,6 +14,10 @@ OVERPASS = "https://overpass.private.coffee/api/interpreter"
 OSM_READ = 'https://api.openstreetmap.org/api/0.6'
 
 
+class NoRouteFound(ValueError):
+    """The routing service could not find a mapped connection."""
+
+
 def endpoint(value):
     parsed = urlsplit(value)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
@@ -162,7 +166,9 @@ class Services:
             # Never draw a straight shortcut between disconnected leg shapes.
             continue
         if not results:
-            raise ValueError(rejected[0] if rejected else response.get("error", "No connected road route found. Try closer stops."))
+            if rejected:
+                raise ValueError(rejected[0])
+            raise NoRouteFound(response.get("error", "No connected road route found. Try closer stops."))
         return results
 
     async def mixed_route(self, legs, url=VALHALLA, overpass_url=OVERPASS, include_stops=True):
@@ -181,12 +187,15 @@ class Services:
             waypoints = [start, *spec["controls"], end]
             try:
                 short_walk = spec["profile"] == "walk_auto" and Route(waypoints).total <= SHORT_WALK_METRES
-                if short_walk:
-                    choices = [{"points": Route(waypoints).points,
-                                "speed_warning": "Direct short walking connection (unmapped access)."}]
-                elif profile["costing"]:
+                if profile["costing"]:
                     mode = {"auto": "Drive", "pedestrian": "Walk", "bicycle": "Cycle"}[profile["costing"]]
-                    choices = await self.route(waypoints, mode, url, profile["options"])
+                    try:
+                        choices = await self.route(waypoints, mode, url, profile["options"])
+                    except NoRouteFound:
+                        if not short_walk:
+                            raise
+                        choices = [{"points": Route(waypoints).points,
+                                    "speed_warning": "No mapped walking connection; using a direct short connection (unmapped access)."}]
                 else:
                     choices = [{"points": Route(waypoints).points}]
                 options = []

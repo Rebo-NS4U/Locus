@@ -20,8 +20,9 @@ PROFILES = {
     "cycle_paths": {"label": "Cycle · paths", "costing": "bicycle", "speed": 23.4, "color": "#cebdfe", "options": {"use_roads": .1}},
 }
 
-# Walking connects nearby stops without forcing them onto the road network.
-PROFILES["walk_auto"] = {**PROFILES["walk_sidewalks"], "label": "Walking"}
+# Prefer sidewalks and trails; short unmapped connections are a fallback only.
+PROFILES["walk_auto"] = {**PROFILES["walk_sidewalks"], "label": "Walking",
+                         "options": {**PROFILES["walk_sidewalks"]["options"], "walkway_factor": .4, "use_tracks": 1}}
 
 # Keep existing profile IDs so saved projects retain their routing settings.
 PROFILES["run_roads"] = {**PROFILES["run_paths"], "label": "Run · prefer sidewalks", "options": {"walking_speed": 11.88, "sidewalk_factor": .4, "walkway_factor": .8, "use_tracks": 0, "max_hiking_difficulty": 0}}
