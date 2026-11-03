@@ -17,6 +17,18 @@ PROFILES = {
     "cycle_paths": {"label": "Cycle · paths", "costing": "bicycle", "speed": 23.4, "color": "#cebdfe", "options": {"use_roads": .1}},
 }
 
+# Keep existing profile IDs so saved projects retain their routing settings.
+PROFILES["run_roads"] = {**PROFILES["run_paths"], "label": "Run · prefer sidewalks", "options": {"walking_speed": 11.88, "sidewalk_factor": .4, "walkway_factor": .8, "use_tracks": 0, "max_hiking_difficulty": 0}}
+PROFILES["cycle_roads"] = {**PROFILES["cycle_paths"], "label": "Cycle · prefer roads", "options": {"use_roads": 1}}
+
+TRAVEL_PATHS = {
+    "Walk": (("Roads / sidewalks", "walk_sidewalks"), ("Trails / paths", "walk_trails"), ("Free off-road", "offroad_walk")),
+    "Run": (("Roads / sidewalks", "run_roads"), ("Trails / paths", "run_paths")),
+    "Cycle": (("Roads", "cycle_roads"), ("Trails / paths", "cycle_paths")),
+    "Drive": (("Roads", "car_roads"), ("Dirt tracks", "car_tracks"), ("Free off-road", "offroad_car")),
+}
+
+
 
 def specification(value=None, default="walk_sidewalks"):
     value = value or {}

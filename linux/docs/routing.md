@@ -10,11 +10,21 @@ and makes that stop the target for Insert, Remove and reorder controls.
 
 ## Per-segment route types
 
+Choose **Travel mode** (Walk, Run, Cycle or Drive), then **Path type** separately.
+Walk and Run offer Roads / sidewalks or Trails / paths; Cycle offers Roads or
+Trails / paths. Drive offers Roads, Dirt tracks or Free off-road. Walk also offers
+Free off-road. Path choices are routing preferences, subject to mapped access.
+Auto/manual speed remains independent. Changing travel mode selects its first
+path type; switching between segments restores both saved choices.
+Existing projects retain their original routing profiles.
+
 | Profile | Geometry | Automatic target speed |
 | --- | --- | --- |
 | Walk · prefer sidewalks | Pedestrian routing favoring sidewalks and walkways | 5.04 km/h estimate |
 | Walk · prefer trails | Pedestrian routing favoring paths/tracks, permitting hiking trails | 4.3 km/h estimate |
+| Run · prefer sidewalks | Pedestrian routing favoring sidewalks | 11.88 km/h estimate |
 | Run · paths | Pedestrian routing with a running speed estimate | 11.88 km/h estimate |
+| Cycle · prefer roads | Bicycle routing favoring roads | 23.4 km/h estimate |
 | Cycle · paths | Bicycle routing favoring paths | 23.4 km/h estimate |
 | Car · roads | Driving routes avoiding intermediate unpaved roads | Mapped road speeds/limits; fallback estimate 30 km/h |
 | Car · prefer dirt tracks | Driving routes favoring tracks and avoiding highways | Road/surface metadata; capped at 25 km/h, rough surfaces at 15 km/h |

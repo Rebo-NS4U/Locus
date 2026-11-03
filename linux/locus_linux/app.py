@@ -26,7 +26,7 @@ from .storage import Places
 from .services import Services, PHOTON, VALHALLA, OVERPASS, endpoint
 from .theme import apply_theme, read_colors
 from .units import to_mph, to_kph, speed_text, METRES_PER_MILE
-from .planning import RoutePlan, PROFILES
+from .planning import RoutePlan, PROFILES, TRAVEL_PATHS
 from .activation import activate_existing, listen_for_activation
 
 
@@ -428,12 +428,19 @@ class Window(QMainWindow):
         stops_box.addLayout(row)
         self.segment_group = QGroupBox("Shape & speed")
         editor = QVBoxLayout(self.segment_group)
+        editor.addWidget(QLabel("Travel mode"))
+        self.segment_travel = QComboBox()
+        self.segment_travel.addItems(list(TRAVEL_PATHS))
+        self.segment_travel.setToolTip("Choose Walk, Run, Cycle or Drive for this segment")
+        editor.addWidget(self.segment_travel)
+        editor.addWidget(QLabel("Path type"))
         self.segment_profile = QComboBox()
         self.segment_profile.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.segment_profile.setMinimumContentsLength(12)
-        for key, profile in PROFILES.items():
-            self.segment_profile.addItem(profile["label"], key)
+        self.segment_profile.setToolTip("Choose the preferred roads, trails or free path for this travel mode")
         editor.addWidget(self.segment_profile)
+        self.populate_segment_paths()
+        self.segment_travel.currentTextChanged.connect(self.change_segment_travel)
         speed_row = QHBoxLayout()
         self.segment_speed_mode = QComboBox()
         self.segment_speed_mode.addItem("Auto speed", "auto")
@@ -963,6 +970,21 @@ class Window(QMainWindow):
         self.select_segment(self.selected_segment())
         self.rebuild_route()
 
+    def populate_segment_paths(self, profile=None):
+        self.segment_profile.blockSignals(True)
+        self.segment_profile.clear()
+        for label, key in TRAVEL_PATHS[self.segment_travel.currentText()]:
+            self.segment_profile.addItem(label, key)
+        index = self.segment_profile.findData(profile)
+        self.segment_profile.setCurrentIndex(max(0, index))
+        self.segment_profile.blockSignals(False)
+
+    def change_segment_travel(self, *unused):
+        if self.segment_loading:
+            return
+        self.populate_segment_paths()
+        self.update_segment()
+
     def select_segment(self, index):
         valid = 0 <= index < len(self.stops) - 1
         self.segment_group.setEnabled(valid)
@@ -972,7 +994,10 @@ class Window(QMainWindow):
         self.alternatives = []
         if valid:
             spec = self.route_plan.spec(index)
-            self.segment_profile.setCurrentIndex(self.segment_profile.findData(spec["profile"]))
+            mode = next(mode for mode, paths in TRAVEL_PATHS.items()
+                        if any(key == spec["profile"] for _, key in paths))
+            self.segment_travel.setCurrentText(mode)
+            self.populate_segment_paths(spec["profile"])
             self.segment_speed_mode.setCurrentIndex(self.segment_speed_mode.findData(spec["speed_mode"]))
             self.segment_speed.setValue(to_mph(spec["speed_kph"]))
             self.segment_speed.setEnabled(spec["speed_mode"] == "manual")
