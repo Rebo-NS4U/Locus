@@ -3,22 +3,18 @@ const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
 tiles.on('tileerror', () => { document.getElementById('notice').hidden = false; });
-let marker, acknowledged, routeLine, bridge, stopMarkers = [], bendMarkers = [], follow = true;
+let acknowledged, routeLine, bridge, stopMarkers = [], bendMarkers = [], follow = true;
 let palette = {accent: '#ffb77e', text: '#efdfd6', bg: '#423429'};
 window.setTheme = colors => {
   palette = colors;
   for (const [key, value] of Object.entries(colors)) document.documentElement.style.setProperty('--' + key, value);
-  if (marker) marker.setStyle({color: palette.accent});
   if (routeLine) routeLine.eachLayer(layer => layer.setStyle({color: layer.options.segmentColor || palette.accent}));
 };
 window.setOptions = (night, shouldFollow) => {
   document.body.classList.toggle('night', night);
   follow = shouldFollow;
 };
-window.setPin = (lat, lon) => {
-  if (marker) marker.remove();
-  marker = L.circleMarker([lat, lon], {radius: 10, color: palette.accent, weight: 3, fillOpacity: 0.15}).addTo(map);
-  marker.bindTooltip('Selected pin · preview');
+window.focusLocation = (lat, lon) => {
   map.panTo([lat, lon]);
 };
 window.setAcknowledged = (point, connected) => {
@@ -77,7 +73,7 @@ new QWebChannel(qt.webChannelTransport, channel => {
   bridge = channel.objects.locus;
   map.on('dblclick', event => {
     const point = event.latlng.wrap();
-    setPin(point.lat, point.lng);
+    focusLocation(point.lat, point.lng);
     channel.objects.locus.pick(point.lat, point.lng);
   });
 });

@@ -350,7 +350,7 @@ class Window(QMainWindow):
             field.setValue(value)
             fields.addWidget(QLabel(label))
             fields.addWidget(field)
-        self.button("Preview pin", self.preview, fields)
+        self.button("Center map", self.preview, fields)
         group = self.group("Map display", box)
         self.map_style = QComboBox()
         self.map_style.addItems(["Night map", "Street map"])
@@ -361,7 +361,7 @@ class Window(QMainWindow):
         self.follow.toggled.connect(self.map_options)
         group.addWidget(self.follow)
         self.button("Fit route", lambda: self.js("fitRoute()"), group)
-        legend = QLabel("The ring marks your preview pin. The solid dot marks the last acknowledged command, not an independent GPS reading. Verify the result in Maps on your iPhone.")
+        legend = QLabel("Numbered pins mark route stops. The solid dot marks the last acknowledged command, not an independent GPS reading. Verify the result in Maps on your iPhone.")
         legend.setWordWrap(True)
         legend.setObjectName("subtitle")
         box.addWidget(legend)
@@ -413,8 +413,8 @@ class Window(QMainWindow):
         stops_box.addWidget(self.stop_list)
         row = QHBoxLayout()
         for label, callback, tip in [
-                ("Add", self.add_stop, "Append the preview pin as a stop"),
-                ("Insert", self.insert_stop, "Insert the preview pin after the selected stop"),
+                ("Add", self.add_stop, "Append the selected coordinates as a stop"),
+                ("Insert", self.insert_stop, "Insert the selected coordinates after the selected stop"),
                 ("Remove", self.remove_stop, "Remove the selected stop")]:
             self.button(label, callback, row).setToolTip(tip)
         for label, direction in [("↑", -1), ("↓", 1)]:
@@ -458,7 +458,7 @@ class Window(QMainWindow):
         self.draw_stops.toggled.connect(lambda checked: self.draw_bends.setChecked(False) if checked else None)
         editor.addWidget(self.draw_bends)
         bend_row = QHBoxLayout()
-        self.button("Add bend", self.add_bend, bend_row).setToolTip("Use the preview pin as an intermediate bend")
+        self.button("Add bend", self.add_bend, bend_row).setToolTip("Use the selected coordinates as an intermediate bend")
         self.button("Undo", self.undo_bend, bend_row).setToolTip("Remove the last bend")
         self.button("Clear", self.clear_bends, bend_row).setToolTip("Remove this segment's bends")
         editor.addLayout(bend_row)
@@ -629,7 +629,7 @@ class Window(QMainWindow):
         for title, body in [
             ("1 · Connect and trust", "Connect your iPhone with a USB data cable, unlock it and accept Trust This Computer. Linux needs usbmuxd and libimobiledevice installed."),
             ("2 · Enable developer access", "Use iOS 17.4 or newer. Enable Developer Mode in Settings → Privacy & Security and restart if prompted. Scan, select the phone and choose Prepare iPhone. First preparation downloads Apple's developer image."),
-            ("3 · Pick a location", "Search, double-click the map or enter coordinates. These only preview a pin. Set location applies it. Verify the result in Maps on the phone."),
+            ("3 · Pick a location", "Search, double-click the map or enter coordinates. These select coordinates without applying them. Set location applies it. Verify the result in Maps on the phone."),
             ("4 · Move or connect wirelessly", "Use Move for the joystick. In Route, set a profile and Auto/manual speed for each pin-to-pin segment, add or drag bends, then Plan segments. Wi-Fi: restore first, enable it over USB, unplug and scan in Wi-Fi mode."),
             ("5 · Restore before leaving", "Restore real location before disconnecting or quitting. If the connection drops, the location is unknown. Reconnect the same phone to restore; a phone restart may be needed if simulation stays stuck.")]:
             heading = QLabel(title)
@@ -689,7 +689,7 @@ class Window(QMainWindow):
                 ("Select your phone, then Prepare iPhone." if result else "No iPhone found. Connect and unlock it; for Wi-Fi, enable it over USB first and use the same network."))
         elif operation == "search":
             self.populate(self.results, result)
-            self.status.setText(f"{len(result)} places found. Select one to preview.")
+            self.status.setText(f"{len(result)} places found. Select one to center the map.")
         elif operation == "mixed_route":
             try:
                 if self.route_plan is not self.planning_document:
@@ -803,7 +803,7 @@ class Window(QMainWindow):
         self.map.page().runJavaScript(function if not args else function + "(" + ",".join(json.dumps(arg) for arg in args) + ")")
 
     def preview(self):
-        self.js("setPin", self.latitude.value(), self.longitude.value())
+        self.js("focusLocation", self.latitude.value(), self.longitude.value())
 
     def release_map(self):
         # Flush the disk cache on exit; Qt requires pages to die first.

@@ -103,12 +103,15 @@ def check():
                     map.fire('click', event);
                     map.fire('click', event);
                     map.fire('dblclick', event);
-                    return !map.doubleClickZoom.enabled() && map.getZoom() === zoom;
+                    const layers = [];
+                    map.eachLayer(layer => layers.push(layer));
+                    return !map.doubleClickZoom.enabled() && map.getZoom() === zoom
+                        && !layers.some(layer => layer instanceof L.CircleMarker);
                 })()
             """, gesture_results.append)
             stage = 1
         elif stage == 1 and len(window.stops) == 1 and gesture_results:
-            assert gesture_results == [True], 'Double-click must place one pin without zooming'
+            assert gesture_results == [True], 'Double-click must select coordinates without zooming or a preview circle'
             assert window.worker.session.target is None, 'Double-click must only preview'
             assert window.map.width() <= collapsed_width - 300
             tab_geometry = window.tabs.tabBar().geometry()

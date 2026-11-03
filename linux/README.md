@@ -21,7 +21,7 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   Controls preserves its width. Status updates keep the action bar and footer stable.
   Set location, Hold and Restore remain accessible with Controls hidden.
 - Explicit place search, map pins, coordinates, favorites, rename/delete and
-  twenty recent applied locations. Selecting a place only previews it.
+  twenty recent applied locations. Selecting a place centers the map without applying it.
 - Eight-direction joystick and optional WASD/arrow-key controls. Releasing the
   control or leaving the window holds position. Keyboard movement stays off in
   text fields and coordinate editors.
@@ -51,7 +51,7 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   one track segment or route at a time and rejects separated segments rather
   than drawing unexplained connecting lines.
 - Route start, pause, resume, hold, looping, distance progress and a moving marker
-  that shows the last acknowledged command separately from the preview pin.
+  that shows the last acknowledged command alongside numbered route pins.
 - USB pairing/preparation and rootless USB or trusted Wi-Fi iPhone transport.
 - One-second refresh, optional reconnection to the same phone, background drop
   notifications where supported, persistent recovery state and a quit prompt.
@@ -113,8 +113,8 @@ select the phone and choose **Prepare iPhone**. Accept the trust prompt. Enable
 Developer Mode under Settings → Privacy & Security and restart if prompted.
 First preparation requires internet to fetch Apple's developer disk image.
 
-Search, select a saved place, double-click the map or enter coordinates. These preview a
-pin; double-clicking does not zoom or send phone commands. **Set location** sends it to the selected phone. Check the result in Maps.
+Search, select a saved place, double-click the map or enter coordinates. These select
+coordinates without a preview circle; double-clicking does not zoom or send phone commands. **Set location** sends it to the selected phone. Check the result in Maps.
 Use Move for joystick/imported-GPX speed controls. On Route, add or drag pins,
 select each segment's profile and speed, add/drag bends, then **Plan segments**.
 **All free path** changes every segment to a direct off-road path. You can also
