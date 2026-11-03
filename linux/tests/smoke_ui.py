@@ -214,16 +214,12 @@ def check():
             window.route_options.setCurrentIndex(1)
             assert window.route_points == points
             assert window.sidebar_scroll.horizontalScrollBar().maximum() == 0, 'Sidebar must fit without horizontal clipping'
-            assert [window.segment_travel.itemText(i) for i in range(4)] == ['Walk', 'Run', 'Cycle', 'Drive']
-            window.segment_travel.setCurrentText('Run')
-            assert window.route_plan.spec(0)['profile'] == 'run_roads'
-            window.segment_profile.setCurrentIndex(window.segment_profile.findData('run_paths'))
-            assert window.route_plan.spec(0)['profile'] == 'run_paths'
-            window.segment_travel.setCurrentText('Cycle')
-            assert window.route_plan.spec(0)['profile'] == 'cycle_roads'
-            window.segment_profile.setCurrentIndex(window.segment_profile.findData('cycle_paths'))
+            assert [window.segment_travel.itemText(i) for i in range(window.segment_travel.count())] == ['Walking', 'Driving', 'Cycling']
+            window.segment_travel.setCurrentText('Walking')
+            assert window.route_plan.spec(0)['profile'] == 'walk_sidewalks'
+            window.segment_travel.setCurrentText('Cycling')
             assert window.route_plan.spec(0)['profile'] == 'cycle_paths'
-            window.segment_travel.setCurrentText('Drive')
+            window.segment_travel.setCurrentText('Driving')
             assert window.route_plan.spec(0)['profile'] == 'car_roads'
             window.draw_bends.setChecked(True)
             window.map.page().runJavaScript("map.fire('click', {latlng: L.latLng(51.5005, -0.1207)})")
@@ -242,14 +238,12 @@ def check():
             assert window.route_list.count() == 5
             assert window.route_plan.spec(0)['profile'] == 'car_roads'
             window.route_list.setCurrentRow(3)
-            window.segment_travel.setCurrentText('Walk')
-            window.segment_profile.setCurrentIndex(window.segment_profile.findData('walk_trails'))
+            window.segment_travel.setCurrentText('Walking')
             window.select_coordinates(51.503, -.123)
             window.add_stop()
             assert window.selected_segment() == 2
             assert window.route_list.currentRow() == 5
-            window.segment_travel.setCurrentText('Drive')
-            window.segment_profile.setCurrentIndex(window.segment_profile.findData('offroad_car'))
+            window.segment_travel.setCurrentText('Driving')
             window.segment_speed_mode.setCurrentIndex(window.segment_speed_mode.findData('manual'))
             window.segment_speed.setValue(12)
             window.save_settings()
@@ -267,7 +261,7 @@ def check():
             assert project.exists()
             with patch.object(QFileDialog, 'getOpenFileName', return_value=(str(project), '')):
                 window.load_project()
-            assert [window.route_plan.spec(i)['profile'] for i in range(3)] == ['car_roads', 'walk_trails', 'offroad_car']
+            assert [window.route_plan.spec(i)['profile'] for i in range(3)] == ['car_roads', 'walk_sidewalks', 'car_roads']
             window.save_settings()
             assert abs(window.store.data['settings']['speed_kph'] - 23.4) < .01
             window.plan_route()

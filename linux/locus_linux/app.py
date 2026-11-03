@@ -26,7 +26,7 @@ from .storage import Places
 from .services import Services, PHOTON, VALHALLA, OVERPASS, endpoint
 from .theme import apply_theme, read_colors
 from .units import to_mph, to_kph, speed_text, METRES_PER_MILE
-from .planning import RoutePlan, PROFILES, TRAVEL_PATHS
+from .planning import RoutePlan, PROFILES, TRAVEL_MODES, travel_mode
 from .activation import activate_existing, listen_for_activation
 
 
@@ -430,16 +430,9 @@ class Window(QMainWindow):
         editor = QVBoxLayout(self.segment_group)
         editor.addWidget(QLabel("Travel mode"))
         self.segment_travel = QComboBox()
-        self.segment_travel.addItems(list(TRAVEL_PATHS))
-        self.segment_travel.setToolTip("Choose Walk, Run, Cycle or Drive for this segment")
+        self.segment_travel.addItems(list(TRAVEL_MODES))
+        self.segment_travel.setToolTip("Choose Walking, Driving or Cycling for this segment")
         editor.addWidget(self.segment_travel)
-        editor.addWidget(QLabel("Path type"))
-        self.segment_profile = QComboBox()
-        self.segment_profile.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-        self.segment_profile.setMinimumContentsLength(12)
-        self.segment_profile.setToolTip("Choose the preferred roads, trails or free path for this travel mode")
-        editor.addWidget(self.segment_profile)
-        self.populate_segment_paths()
         self.segment_travel.currentTextChanged.connect(self.change_segment_travel)
         speed_row = QHBoxLayout()
         self.segment_speed_mode = QComboBox()
@@ -464,7 +457,7 @@ class Window(QMainWindow):
         self.segment_info.setWordWrap(True)
         editor.addWidget(self.segment_info)
         self.segment_group.setEnabled(False)
-        for signal in (self.segment_profile.currentIndexChanged, self.segment_speed_mode.currentIndexChanged, self.segment_speed.valueChanged):
+        for signal in (self.segment_speed_mode.currentIndexChanged, self.segment_speed.valueChanged):
             signal.connect(self.update_segment)
         box.addWidget(self.segment_group)
         self.route_options = QComboBox()
@@ -495,7 +488,6 @@ class Window(QMainWindow):
                                 ("Load project…", self.load_project), ("Save project…", self.save_project)]:
             self.route_menu.addAction(label, callback)
         self.route_menu.addSeparator()
-        self.route_menu.addAction("Use free paths for all segments", self.use_drawn_route)
         self.route_menu.addAction("Clear route", self.clear_route)
         self.route_file_button.setMenu(self.route_menu)
         row.addWidget(self.route_file_button)
@@ -970,20 +962,9 @@ class Window(QMainWindow):
         self.select_segment(self.selected_segment())
         self.rebuild_route()
 
-    def populate_segment_paths(self, profile=None):
-        self.segment_profile.blockSignals(True)
-        self.segment_profile.clear()
-        for label, key in TRAVEL_PATHS[self.segment_travel.currentText()]:
-            self.segment_profile.addItem(label, key)
-        index = self.segment_profile.findData(profile)
-        self.segment_profile.setCurrentIndex(max(0, index))
-        self.segment_profile.blockSignals(False)
-
     def change_segment_travel(self, *unused):
-        if self.segment_loading:
-            return
-        self.populate_segment_paths()
-        self.update_segment()
+        if not self.segment_loading:
+            self.update_segment(mode_changed=True)
 
     def select_segment(self, index):
         valid = 0 <= index < len(self.stops) - 1
@@ -994,10 +975,7 @@ class Window(QMainWindow):
         self.alternatives = []
         if valid:
             spec = self.route_plan.spec(index)
-            mode = next(mode for mode, paths in TRAVEL_PATHS.items()
-                        if any(key == spec["profile"] for _, key in paths))
-            self.segment_travel.setCurrentText(mode)
-            self.populate_segment_paths(spec["profile"])
+            self.segment_travel.setCurrentText(travel_mode(spec["profile"]))
             self.segment_speed_mode.setCurrentIndex(self.segment_speed_mode.findData(spec["speed_mode"]))
             self.segment_speed.setValue(to_mph(spec["speed_kph"]))
             self.segment_speed.setEnabled(spec["speed_mode"] == "manual")
@@ -1019,13 +997,13 @@ class Window(QMainWindow):
                 if option.get('traffic_warning'):
                     text += '\n' + option['traffic_warning']
             else:
-                text += "Needs planning. Auto driving uses road data; free off-road uses an estimated speed."
+                text += "Needs planning. Paths are chosen for this travel mode; automatic driving speed uses road data."
             self.segment_info.setText(text)
         self.route_options.blockSignals(False)
         self.segment_loading = False
         self.redraw_route()
 
-    def update_segment(self, *unused):
+    def update_segment(self, *unused, mode_changed=False):
         index = self.selected_segment()
         if self.segment_loading or index < 0:
             return
@@ -1033,7 +1011,7 @@ class Window(QMainWindow):
             self.select_segment(index)
             return
         old = self.route_plan.spec(index)
-        spec = {**old, "profile": self.segment_profile.currentData(), "speed_mode": self.segment_speed_mode.currentData(), "speed_kph": to_kph(self.segment_speed.value()) if self.segment_speed_mode.currentData() == "manual" else old["speed_kph"]}
+        spec = {**old, "profile": TRAVEL_MODES[self.segment_travel.currentText()] if mode_changed else old["profile"], "speed_mode": self.segment_speed_mode.currentData(), "speed_kph": to_kph(self.segment_speed.value()) if self.segment_speed_mode.currentData() == "manual" else old["speed_kph"]}
         if old["profile"] != spec["profile"] and spec["speed_mode"] == "auto":
             spec["speed_kph"] = PROFILES[spec["profile"]]["speed"]
         try:

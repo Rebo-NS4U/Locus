@@ -31,6 +31,18 @@ TRAVEL_PATHS = {
 }
 
 
+# Legacy profiles remain readable in saved projects; new edits need only a mode.
+TRAVEL_MODES = {"Walking": "walk_sidewalks", "Driving": "car_roads", "Cycling": "cycle_paths"}
+
+
+def travel_mode(profile):
+    if profile.startswith(("car_", "offroad_car")):
+        return "Driving"
+    if profile.startswith("cycle_"):
+        return "Cycling"
+    return "Walking"
+
+
 
 def specification(value=None, default="walk_sidewalks"):
     value = value or {}

@@ -32,15 +32,15 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   variation. Movement and refresh continue while the window is minimized.
 - Route planning keeps Plan, route files and playback pinned below the scrolling
   editor. Numbered stop/segment/shape sections group editing controls; the Route ⋯
-  menu holds GPX, projects, free paths and clear actions.
-- Mapped walking/running excludes ferries, requires connected path geometry and
-  rejects pins more than two meters from their routed endpoint rather than adding
-  a cross-country shortcut. Use a mapped bridge to cross a river; disconnected
-  routes fail planning. Free paths, GPX and joystick remain unconstrained.
-- Up to 99 ordered/draggable pins with separate routing profiles between each
-  pair: sidewalks, trails, running/cycling paths, roads, mapped dirt tracks, free
-  walking paths and free driving paths. Each segment has its own bends, speed
-  policy and alternatives. Insert a pin to split a segment and inherit its settings.
+  menu holds GPX, projects and clear actions.
+- Choose Walking, Driving or Cycling between each pair of up to 99 ordered,
+  draggable pins. The planner selects the appropriate mapped network. Each segment
+  keeps its own bends, speed policy and alternatives. Insert a pin to split a
+  segment and inherit its settings. Existing route projects remain compatible.
+- Mapped walking excludes ferries and requires connected path geometry. Off-path
+  pins connect to that geometry without replacing the entire walking leg with a
+  straight shortcut. Map coverage determines the available paths; use bends to
+  guide a route or GPX for exact geometry.
 - Automatic driving speed from mapped road speeds/limits and surface information,
   with acceleration and braking toward turns/lower limits. Missing data is labeled
   as an estimate. Manual speed overrides are available per segment. This estimates
@@ -127,9 +127,10 @@ even with Controls hidden. In bend editing mode, clicks add bends instead.
 Search, saved places and coordinate fields select coordinates without adding route
 pins. Map clicks do not send phone commands. **Set location** sends it to the selected phone. Check the result in Maps.
 Use Move for joystick/imported-GPX speed controls. On Route, add or drag pins,
-select each segment's profile and speed, add/drag bends, then **Plan segments**.
-**All free path** changes every segment to a direct off-road path. You can also
-import GPX. Explicitly choose **Start route** to apply movement to the phone.
+choose **Walking**, **Driving** or **Cycling** for each segment, then **Plan segments**.
+The planner chooses mapped paths appropriate to the mode. Walking preserves the
+mapped path even when both pins need connectors. You can add bends to guide the
+route or import GPX for exact geometry. Older projects retain their saved profiles. Explicitly choose **Start route** to apply movement to the phone.
 
 For Wi-Fi, first restore any active session, select USB and choose **Enable Wi-Fi
 over USB**. It saves the trusted pairing and enables wireless connections. Unplug

@@ -69,7 +69,7 @@ class WalkingTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(len(option['connectors']), 1)
                     self.assertEqual(option['speeds'][0 if first else -1], 1.4)
 
-    async def test_two_off_path_walking_stops_connect_directly_with_bends(self):
+    async def test_two_off_path_walking_stops_preserve_mapped_path(self):
         for profile in ('walk_sidewalks', 'walk_trails'):
             for speed_mode in ('auto', 'manual'):
                 service = Services(lambda *_: {'trip': self.trip()})
@@ -79,10 +79,10 @@ class WalkingTests(unittest.IsolatedAsyncioTestCase):
                     'spec': {'profile': profile, 'controls': [bend],
                              'speed_mode': speed_mode, 'speed_kph': 7.2}}])
                 option = result[0][0]
-                self.assertEqual(option['points'], [start, bend, end])
-                self.assertEqual(option['connectors'], [])
-                self.assertEqual(option['speeds'], [2, 2] if speed_mode == 'manual' else [4.3 / 3.6] * 2)
-                self.assertIn('Direct off-road', option['speed_warning'])
+                self.assertEqual(option['points'], [start, *self.points, end])
+                self.assertEqual(len(option['connectors']), 2)
+                self.assertEqual(option['speeds'], [1.4, *([2] * 3 if speed_mode == 'manual' else [5.04 / 3.6 if profile == 'walk_sidewalks' else 4.3 / 3.6] * 3), 1.4])
+                self.assertNotIn('speed_warning', option)
                 self.assertFalse(any(option['driving']))
 
     async def test_alternative_that_reaches_both_pins_keeps_mapped_geometry(self):

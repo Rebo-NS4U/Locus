@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from locus_linux.engine import Session
-from locus_linux.planning import RoutePlan, specification
+from locus_linux.planning import RoutePlan, specification, TRAVEL_MODES, travel_mode
 from locus_linux.routes import Route, distance
 from locus_linux.services import Services, encode_shape
 from test_engine import Transport
@@ -18,6 +18,15 @@ def candidate(points, speed=5, driving=False):
 
 
 class DocumentTests(unittest.TestCase):
+    def test_three_modes_and_legacy_project_profiles(self):
+        self.assertEqual(list(TRAVEL_MODES), ['Walking', 'Driving', 'Cycling'])
+        for mode, profile in TRAVEL_MODES.items():
+            self.assertEqual(travel_mode(profile), mode)
+        for profile in ('walk_trails', 'run_paths', 'offroad_walk'):
+            self.assertEqual(travel_mode(profile), 'Walking')
+        self.assertEqual(travel_mode('offroad_car'), 'Driving')
+        self.assertEqual(travel_mode('cycle_roads'), 'Cycling')
+
     def test_99_pin_limit_for_add_insert_and_project_roundtrip(self):
         plan = RoutePlan()
         plan.reset([(0, i / 1000) for i in range(98)])
