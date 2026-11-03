@@ -25,6 +25,7 @@ from .routes import SPEEDS, Route, parse_gpx, export_gpx
 from .storage import Places
 from .services import Services, PHOTON, VALHALLA, OVERPASS, endpoint
 from .theme import apply_theme, read_colors
+from .units import to_mph, to_kph, speed_text, METRES_PER_MILE
 from .planning import RoutePlan, PROFILES
 from .activation import activate_existing, listen_for_activation
 
@@ -158,7 +159,7 @@ class Window(QMainWindow):
         self.build_ui()
         preferences = self.store.data["settings"]
         self.travel_mode.setCurrentText(preferences.get("travel_mode", "Walk"))
-        self.speed.setValue(preferences.get("speed_kph", self.speed.value()))
+        self.speed.setValue(to_mph(preferences.get("speed_kph", to_kph(self.speed.value()))))
         self.variation.setChecked(preferences.get("variation", False))
         self.map_style.setCurrentIndex(0 if preferences.get("night_map", True) else 1)
         self.follow.setChecked(preferences.get("follow", True))
@@ -211,7 +212,6 @@ class Window(QMainWindow):
         header.setSpacing(8)
         title = QLabel("Locus · Demo" if self.demo else "Locus")
         title.setObjectName("brand")
-        title.setStyleSheet("font-size: 23px; font-weight: 700;")
         title.setToolTip("Locus for Linux" + (" · DEMO: no phone commands" if self.demo else ""))
         header.addWidget(title)
         self.sidebar_toggle = QPushButton("Controls")
@@ -260,7 +260,7 @@ class Window(QMainWindow):
         self.tabs.setObjectName("inspector")
         self.tabs.setMinimumWidth(360)
         self.tabs.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
-        self.tabs.setStyleSheet("QWidget { font-size: 13px; } QTabBar::tab { padding: 7px 6px; }")
+        self.tabs.setStyleSheet("QTabBar::tab { padding: 7px 6px; }")
         self.tabs.setUsesScrollButtons(False)
         self.tab_scrolls = []
         for widget, title in [(self.places_tab(), "Places"), (self.route_tab(), "Route"),
@@ -319,7 +319,6 @@ class Window(QMainWindow):
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setObjectName("status")
         footer.addWidget(self.status, 1)
-        self.connection_badge.setStyleSheet("font-size: 12px;")
         footer.addWidget(self.connection_badge)
         layout.addWidget(statusbar)
         self.setCentralWidget(root)
@@ -447,9 +446,9 @@ class Window(QMainWindow):
         self.segment_speed_mode.setToolTip("Auto driving uses mapped speeds/limits and turn geometry. Other profiles or missing road data use an estimate. This does not measure the phone's real driving speed.")
         speed_row.addWidget(self.segment_speed_mode)
         self.segment_speed = QDoubleSpinBox()
-        self.segment_speed.setRange(.36, 360)
+        self.segment_speed.setRange(.23, 223.69)
         self.segment_speed.setDecimals(2)
-        self.segment_speed.setSuffix(" km/h")
+        self.segment_speed.setSuffix(" mph")
         speed_row.addWidget(self.segment_speed)
         editor.addLayout(speed_row)
         self.draw_bends = QCheckBox("Map clicks add bends")
@@ -527,10 +526,10 @@ class Window(QMainWindow):
         self.travel_mode.currentTextChanged.connect(self.preset_speed)
         group.addWidget(self.travel_mode)
         self.speed = QDoubleSpinBox()
-        self.speed.setRange(0.36, 360)
+        self.speed.setRange(.23, 223.69)
         self.speed.setDecimals(2)
-        self.speed.setSuffix(" km/h")
-        self.speed.setValue(5.04)
+        self.speed.setSuffix(" mph")
+        self.speed.setValue(to_mph(5.04))
         self.speed.valueChanged.connect(self.configure_motion)
         group.addWidget(self.speed)
         self.variation = QCheckBox("Natural speed variation (±10%)")
@@ -630,7 +629,6 @@ class Window(QMainWindow):
             ("4 · Move or connect wirelessly", "Use Move for the joystick. In Route, set a profile and Auto/manual speed for each pin-to-pin segment, add or drag bends, then Plan segments. Wi-Fi: restore first, enable it over USB, unplug and scan in Wi-Fi mode."),
             ("5 · Restore before leaving", "Restore real location before disconnecting or quitting. If the connection drops, the location is unknown. Reconnect the same phone to restore; a phone restart may be needed if simulation stays stuck.")]:
             heading = QLabel(title)
-            heading.setStyleSheet("font-weight: 600;")
             label = QLabel(body)
             label.setWordWrap(True)
             layout.addWidget(heading)
@@ -696,7 +694,7 @@ class Window(QMainWindow):
                 self.js("fitRoute()")
                 self.status.setText("Segments planned. Select a colored segment to change its profile, bends, speed or alternative.")
             except ValueError as error:
-                self.status.setText(str(error))
+                self.status.setText(speed_text(str(error)))
         elif operation == "set_mode":
             self.devices.clear()
             self.status.setText(result)
@@ -732,7 +730,7 @@ class Window(QMainWindow):
         self.connection_badge.setText(("Demo session" if self.demo else "Location active") if state["connected"] else "Location unknown / inactive")
         self.connection_badge.setStyleSheet(f"color: {self.colors['accent'] if state['connected'] else self.colors['muted']};")
         self.js("setAcknowledged", state["position"], state["connected"])
-        self.progress.setText(f"{'Paused / holding' if state['paused'] else 'Following route'} · {state['progress'] / 1000:.2f} / {state['total'] / 1000:.2f} km · {state.get('speed_kph', 0):.1f} km/h\n{state.get('speed_source', '')}" if state["total"] else "Not following a route")
+        self.progress.setText(f"{'Paused / holding' if state['paused'] else 'Following route'} · {state['progress'] / METRES_PER_MILE:.2f} / {state['total'] / METRES_PER_MILE:.2f} mi · {to_mph(state.get('speed_kph', 0)):.1f} mph\n{speed_text(state.get('speed_source', ''))}" if state["total"] else "Not following a route")
         if state.get('traffic_stop'):
             stop = state['traffic_stop']
             label = 'Stop sign' if stop['kind'] == 'stop_sign' else 'Simulated red light'
@@ -741,12 +739,12 @@ class Window(QMainWindow):
 
     def configure_motion(self, *unused):
         if self.ready:
-            self.worker.submit("configure", self.speed.value() / 3.6, self.variation.isChecked(), self.reconnect.isChecked())
+            self.worker.submit("configure", to_kph(self.speed.value()) / 3.6, self.variation.isChecked(), self.reconnect.isChecked())
             self.worker.submit('configure_traffic', self.traffic_stops.isChecked(), self.red_probability.value() / 100)
 
     def preset_speed(self, mode):
         if hasattr(self, "speed"):
-            self.speed.setValue(SPEEDS[mode] * 3.6)
+            self.speed.setValue(to_mph(SPEEDS[mode] * 3.6))
 
     def joystick(self, east, north):
         if self.ready and not self.busy:
@@ -815,8 +813,13 @@ class Window(QMainWindow):
             if self.map.focusProxy():
                 self.map.focusProxy().installEventFilter(self)
             self.js("setTheme", self.colors)
+            self.map_typography()
             self.map_options()
             self.redraw_route()
+
+    def map_typography(self):
+        font = QApplication.instance().font()
+        self.js("setTypography", font.family(), font.pointSizeF())
 
     def map_options(self, *unused):
         if hasattr(self, "map"):
@@ -830,6 +833,7 @@ class Window(QMainWindow):
             self.font_stamp = stamp
             self.colors = apply_theme(QApplication.instance(), colors)
             self.js("setTheme", colors)
+            self.map_typography()
 
     def search_places(self):
         self.request("search", self.search.text(), self.store.data["settings"].get("photon", PHOTON))
@@ -890,7 +894,7 @@ class Window(QMainWindow):
                 self.route_plan.add((self.latitude.value(), self.longitude.value()), default)
                 self.stops_changed()
             except ValueError as error:
-                self.status.setText(str(error))
+                self.status.setText(speed_text(str(error)))
 
     def remove_stop(self):
         index = self.stop_list.currentRow()
@@ -908,7 +912,7 @@ class Window(QMainWindow):
                 self.stops_changed()
                 self.stop_list.setCurrentRow(index)
             except ValueError as error:
-                self.status.setText(str(error))
+                self.status.setText(speed_text(str(error)))
 
     def move_stop(self, index, latitude, longitude):
         from .engine import coordinates
@@ -920,7 +924,7 @@ class Window(QMainWindow):
                 self.route_plan.move(index, coordinates(latitude, longitude))
                 self.stops_changed()
             except ValueError as error:
-                self.status.setText(str(error))
+                self.status.setText(speed_text(str(error)))
 
     def reorder_stop(self, direction):
         index, target = self.stop_list.currentRow(), self.stop_list.currentRow() + direction
@@ -964,20 +968,20 @@ class Window(QMainWindow):
             spec = self.route_plan.spec(index)
             self.segment_profile.setCurrentIndex(self.segment_profile.findData(spec["profile"]))
             self.segment_speed_mode.setCurrentIndex(self.segment_speed_mode.findData(spec["speed_mode"]))
-            self.segment_speed.setValue(spec["speed_kph"])
+            self.segment_speed.setValue(to_mph(spec["speed_kph"]))
             self.segment_speed.setEnabled(spec["speed_mode"] == "manual")
             self.segment_speed.setVisible(spec["speed_mode"] == "manual")
             key = self.route_plan.key(index)
             self.alternatives = self.route_plan.results.get(key, [])
             for i, option in enumerate(self.alternatives):
-                self.route_options.addItem(f"Path {i + 1} · {option['distance'] / 1000:.2f} km · ~{option['seconds'] / 60:.1f} min")
+                self.route_options.addItem(f"Path {i + 1} · {option['distance'] / METRES_PER_MILE:.2f} mi · ~{option['seconds'] / 60:.1f} min")
             self.route_options.setCurrentIndex(self.route_plan.selected.get(key, 0))
             text = f"{len(spec['controls'])} bends · "
             if self.alternatives:
                 option = self.alternatives[self.route_plan.selected.get(key, 0)]
-                low, high = min(option["speeds"]) * 3.6, max(option["speeds"]) * 3.6
-                text += f"targets {low:.1f}–{high:.1f} km/h\n"
-                text += option.get("speed_warning", option["sources"][0])
+                low, high = to_mph(min(option["speeds"]) * 3.6), to_mph(max(option["speeds"]) * 3.6)
+                text += f"targets {low:.1f}–{high:.1f} mph\n"
+                text += speed_text(option.get("speed_warning", option["sources"][0]))
                 signs = sum(stop['kind'] == 'stop_sign' for stop in option.get('stops', []))
                 lights = sum(stop['kind'] == 'traffic_light' for stop in option.get('stops', []))
                 text += f'\n{signs} stop signs · {lights} traffic lights'
@@ -998,14 +1002,14 @@ class Window(QMainWindow):
             self.select_segment(index)
             return
         old = self.route_plan.spec(index)
-        spec = {**old, "profile": self.segment_profile.currentData(), "speed_mode": self.segment_speed_mode.currentData(), "speed_kph": self.segment_speed.value()}
+        spec = {**old, "profile": self.segment_profile.currentData(), "speed_mode": self.segment_speed_mode.currentData(), "speed_kph": to_kph(self.segment_speed.value()) if self.segment_speed_mode.currentData() == "manual" else old["speed_kph"]}
         if old["profile"] != spec["profile"] and spec["speed_mode"] == "auto":
             spec["speed_kph"] = PROFILES[spec["profile"]]["speed"]
         try:
             self.route_plan.update(index, spec)
             self.stops_changed()
         except ValueError as error:
-            self.status.setText(str(error))
+            self.status.setText(speed_text(str(error)))
             self.select_segment(index)
 
     def add_bend(self):
@@ -1040,14 +1044,14 @@ class Window(QMainWindow):
                     spec["controls"][bend] = coordinates(latitude, longitude)
                     self.change_bends(segment, spec)
                 except ValueError as error:
-                    self.status.setText(str(error))
+                    self.status.setText(speed_text(str(error)))
 
     def change_bends(self, index, spec):
         try:
             self.route_plan.update(index, spec)
             self.stops_changed()
         except ValueError as error:
-            self.status.setText(str(error))
+            self.status.setText(speed_text(str(error)))
 
     def delete_bend(self, segment, bend):
         if self.editable_route() and 0 <= segment < len(self.stops) - 1:
@@ -1086,7 +1090,7 @@ class Window(QMainWindow):
 
     def show_route_summary(self, source):
         route = Route(self.route_points)
-        self.route_summary.setText(f"{source} · {route.total / 1000:.2f} km · {len(route.points)} points")
+        self.route_summary.setText(f"{source} · {route.total / METRES_PER_MILE:.2f} mi · {len(route.points)} points")
         self.redraw_route()
 
     def plan_route(self):
@@ -1122,7 +1126,7 @@ class Window(QMainWindow):
                 Path(path).write_text(json.dumps(data, indent=2))
                 self.status.setText("Route project saved with segment profiles, bends and speed choices.")
         except (OSError, ValueError) as error:
-            self.status.setText(str(error))
+            self.status.setText(speed_text(str(error)))
 
     def load_project(self):
         if not self.editable_route():
@@ -1166,19 +1170,19 @@ class Window(QMainWindow):
                 Path(path).write_bytes(data)
                 self.status.setText("GPX route exported.")
         except (OSError, ValueError) as error:
-            self.status.setText(str(error))
+            self.status.setText(speed_text(str(error)))
 
     def save_settings(self):
         try:
             self.store.data["settings"].update(photon=endpoint(self.photon.text().strip()), valhalla=endpoint(self.valhalla.text().strip()),
                 reconnect=self.reconnect.isChecked(), notifications=self.notifications.isChecked(), travel_mode=self.travel_mode.currentText(),
-                speed_kph=self.speed.value(), variation=self.variation.isChecked(), night_map=self.map_style.currentIndex() == 0, follow=self.follow.isChecked(),
+                speed_kph=to_kph(self.speed.value()), variation=self.variation.isChecked(), night_map=self.map_style.currentIndex() == 0, follow=self.follow.isChecked(),
                 traffic_stops=self.traffic_stops.isChecked(), red_probability=self.red_probability.value(), overpass=endpoint(self.overpass.text().strip()))
             self.store.save()
             self.configure_motion()
             self.status.setText("Settings saved.")
         except (OSError, ValueError) as error:
-            self.status.setText(str(error))
+            self.status.setText(speed_text(str(error)))
 
     def closeEvent(self, event):
         if not self.worker.isRunning():

@@ -24,6 +24,12 @@ html { border-radius: 18px; overflow: hidden; }
 .leaflet-control-attribution { border-radius: 12px 0 0 0; padding: 5px 10px!important; }
 .leaflet-tooltip { border-radius: 12px; padding: 8px 12px; box-shadow: 0 4px 18px #0003; }
 #notice { left: 18px; bottom: 40px; max-width: calc(100% - 60px); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; }
+/* Match every overlay to the native application's desktop font. */
+.leaflet-container, .leaflet-container *, #notice {
+  font-family: var(--font-family, "Noto Sans"), sans-serif !important;
+  font-size: var(--font-size, 11pt) !important;
+  font-weight: 400 !important;
+}
 </style>
 </head><body><div id="map"></div><div id="notice" hidden>Map tiles unavailable. Coordinate entry still works.</div>
 <script src="leaflet.js"></script><script src="qrc:///qtwebchannel/qwebchannel.js"></script><script src="map.js"></script></body></html>

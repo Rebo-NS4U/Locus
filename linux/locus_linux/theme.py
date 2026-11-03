@@ -78,14 +78,14 @@ def apply_theme(app, colors=None):
         QSlider::handle:horizontal { background: %(accent)s; width: 14px; margin: -5px 0; border-radius: 7px; }
         QProgressBar { background: %(field)s; border: 0; border-radius: 6px; text-align: center; color: %(text)s; }
         QProgressBar::chunk { background: %(accent)s; border-radius: 6px; }
-        QGroupBox { background: %(card)s; border: 1px solid %(edge)s; border-radius: 16px; margin-top: 16px; padding: 18px 12px 12px; font-weight: 600; }
+        QGroupBox { background: %(card)s; border: 1px solid %(edge)s; border-radius: 16px; margin-top: 16px; padding: 18px 12px 12px; }
         QGroupBox::title { subcontrol-origin: margin; left: 16px; padding: 0 6px; color: %(accent)s; }
         QPushButton, QToolButton { background: %(card)s; color: %(text)s; border: 1px solid %(edge)s; border-radius: 16px; min-height: 20px; padding: 7px 12px; }
         QPushButton:hover, QToolButton:hover { background: %(hover)s; }
         QPushButton:pressed, QToolButton:pressed { background: %(pressed)s; border-color: %(accent)s; }
         QPushButton:checked, QToolButton:checked { background: %(accent)s; color: %(on_accent)s; border-color: %(accent)s; }
         QPushButton:focus, QToolButton:focus { border: 1px solid %(accent)s; }
-        QPushButton#primary { background: %(accent)s; color: %(on_accent)s; border-color: %(accent)s; font-weight: 600; }
+        QPushButton#primary { background: %(accent)s; color: %(on_accent)s; border-color: %(accent)s; }
         QPushButton#primary:hover, QPushButton:checked:hover, QToolButton:checked:hover { background: %(primary_hover)s; }
         QPushButton#primary:pressed { background: %(primary_hover)s; border-color: %(text)s; }
         QPushButton:disabled, QPushButton#primary:disabled, QToolButton:disabled { background: %(disabled)s; color: %(muted)s; border-color: %(border)s; }
@@ -109,7 +109,7 @@ def apply_theme(app, colors=None):
         QCheckBox::indicator:checked, QRadioButton::indicator:checked { background: %(accent)s; border: 4px solid %(on_accent)s; }
         QCheckBox::indicator:disabled, QRadioButton::indicator:disabled { background: %(disabled)s; border-color: %(muted)s; }
         QLabel#subtitle { color: %(muted)s; }
-        QLabel#status { background: transparent; border-radius: 10px; padding: 4px 8px; font-size: 12px; }
+        QLabel#status { background: transparent; border-radius: 10px; padding: 4px 8px; }
         QMenu { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 12px; padding: 6px; }
         QMenu::item { padding: 7px 18px; border-radius: 8px; }
         QMenu::item:selected { background: %(hover)s; color: %(text)s; }

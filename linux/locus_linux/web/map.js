@@ -78,3 +78,8 @@ new QWebChannel(qt.webChannelTransport, channel => {
     channel.objects.locus.pick(point.lat, point.lng);
   });
 });
+
+window.setTypography = (family, size) => {
+  document.documentElement.style.setProperty('--font-family', JSON.stringify(family));
+  document.documentElement.style.setProperty('--font-size', size + 'pt');
+};

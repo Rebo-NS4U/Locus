@@ -11,7 +11,8 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   Native window transparency uses the compositor’s background blur when enabled
   (including Niri); map tiles and text stay crisp. Desktop colors and font come from
   Qt6ct, with a warm brown/peach fallback. Palette
-  changes are picked up while the app stays open. Matching night and street maps.
+  changes are picked up while the app stays open. Controls and map overlays share
+  one font family, size and weight. Matching night and street maps.
   UI code changes take effect on the next launch; an active phone session is never
   restarted by installation. Without compositor blur, the tinted shell remains translucent.
 - Map-first layout: one compact action bar, a slim status line and a collapsible
@@ -25,7 +26,9 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 - Eight-direction joystick and optional WASD/arrow-key controls. Releasing the
   control or leaving the window holds position. Keyboard movement stays off in
   text fields and coordinate editors.
-- Walk/run/cycle/drive presets, custom speeds (0.36–360 km/h) and optional ±10%
+- Speeds display and accept mph; route distances display miles. Existing settings
+  and route files retain metric values internally for compatibility.
+- Walk/run/cycle/drive presets, custom speeds (0.23–223.69 mph) and optional ±10%
   variation. Movement and refresh continue while the window is minimized.
 - Route planning keeps Plan, route files and playback pinned below the scrolling
   editor. Numbered stop/segment/shape sections group editing controls; the Route ⋯

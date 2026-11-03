@@ -16,6 +16,7 @@ from PySide6.QtTest import QTest
 from locus_linux.app import Window
 from locus_linux.routes import parse_gpx, export_gpx
 from locus_linux.services import decode_shape
+from locus_linux.units import to_mph, to_kph
 from test_features import encode
 
 points = [(51.5, -.12), (51.501, -.121), (51.502, -.122)]
@@ -86,6 +87,11 @@ def check():
             assert window.centralWidget().objectName() == 'shell'
             shell_pixel = window.grab().toImage().pixelColor(10, window.height() // 2)
             assert 0 < shell_pixel.alpha() < 255, shell_pixel.getRgb()
+            for widget in (window.sidebar_toggle, window.status, window.tabs.tabBar(),
+                           window.speed, window.segment_group, window.connection_badge):
+                assert widget.font().family() == app.font().family()
+                assert widget.font().pointSizeF() == app.font().pointSizeF()
+                assert widget.font().weight() == app.font().weight()
             assert window.traffic_stops.isChecked()
             window.red_probability.setValue(100)
             assert not window.sidebar_scroll.isVisible()
@@ -183,10 +189,15 @@ def check():
                 window.export_gpx()
             assert parse_gpx(exported.read_bytes()) == points
             window.travel_mode.setCurrentText('Cycle')
-            assert window.speed.value() == 23.4
+            assert abs(window.speed.value() - to_mph(23.4)) < .005
+            assert window.speed.suffix() == " mph"
+            assert window.segment_speed.suffix() == " mph"
+            window.save_settings()
+            assert abs(window.store.data['settings']['speed_kph'] - 23.4) < .01
             window.plan_route()
             stage = 4
         elif stage == 4 and not window.busy:
+            assert abs(window.worker.session.speed - to_kph(window.speed.value()) / 3.6) < .0001
             assert window.route_options.count() == 2
             window.route_options.setCurrentIndex(1)
             assert window.route_points == points
@@ -213,18 +224,24 @@ def check():
             window.segment_profile.setCurrentIndex(window.segment_profile.findData('offroad_car'))
             window.segment_speed_mode.setCurrentIndex(window.segment_speed_mode.findData('manual'))
             window.segment_speed.setValue(12)
+            window.save_settings()
+            assert abs(window.store.data['settings']['speed_kph'] - 23.4) < .01
             window.plan_route()
             stage = 42
         elif stage == 42 and not window.busy:
             assert len(window.route_plan.results) == 3
             assert any('limit 30' in source for source in window.route_profile['sources'])
-            assert window.route_plan.spec(2)['speed_kph'] == 12
+            assert abs(window.route_plan.spec(2)['speed_kph'] - to_kph(12)) < .0001
+            assert 'mph' in window.segment_info.text()
+            assert 'km/h' not in window.segment_info.text()
             with patch.object(QFileDialog, 'getSaveFileName', return_value=(str(project), '')):
                 window.save_project()
             assert project.exists()
             with patch.object(QFileDialog, 'getOpenFileName', return_value=(str(project), '')):
                 window.load_project()
             assert [window.route_plan.spec(i)['profile'] for i in range(3)] == ['car_roads', 'walk_trails', 'offroad_car']
+            window.save_settings()
+            assert abs(window.store.data['settings']['speed_kph'] - 23.4) < .01
             window.plan_route()
             stage = 43
         elif stage == 43 and not window.busy:
