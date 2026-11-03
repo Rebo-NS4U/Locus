@@ -112,7 +112,12 @@ class IPhoneTransport:
                             found[phone.udid] = phone.all_values.get("DeviceName", "iPhone") + " · Wi-Fi"
             return list(found.items())
         from pymobiledevice3 import usbmux
-        return [(d.serial, f"iPhone · {d.serial}") for d in await usbmux.list_devices()
+        from pymobiledevice3.exceptions import ConnectionFailedToUsbmuxdError
+        try:
+            devices = await usbmux.list_devices()
+        except ConnectionFailedToUsbmuxdError as error:
+            raise RuntimeError("Apple USB service is unavailable. Install and start usbmuxd, then reconnect the unlocked iPhone and scan again.") from error
+        return [(d.serial, f"iPhone · {d.serial}") for d in devices
                 if d.connection_type == "USB"]
 
     async def prepare(self, device):

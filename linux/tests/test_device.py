@@ -19,6 +19,12 @@ class Context:
 
 
 class DeviceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_missing_usbmuxd_reports_actionable_setup(self):
+        from pymobiledevice3.exceptions import ConnectionFailedToUsbmuxdError
+        with patch('pymobiledevice3.usbmux.list_devices', AsyncMock(side_effect=ConnectionFailedToUsbmuxdError)):
+            with self.assertRaisesRegex(RuntimeError, 'Install and start usbmuxd'):
+                await IPhoneTransport().discover()
+
     async def test_wifi_lookup_authenticates_and_matches_exact_device(self):
         wrong = SimpleNamespace(udid='wrong', paired=True, close=AsyncMock())
         wanted = SimpleNamespace(udid='wanted', paired=True, close=AsyncMock())

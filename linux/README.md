@@ -31,9 +31,12 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 - First-run setup guide and an application-menu installer.
 - `--demo` exercises the same desktop interface with fake phone hardware.
 
-This is a development build. **USB and Wi-Fi have not yet been validated on a
-physical iPhone.** Automated device tests use controlled doubles; passing them
-does not prove a phone/OS combination works. No game compatibility is claimed.
+This is a development build. USB discovery, pairing/developer status, developer
+image preparation and opening/closing the rootless location-service connection
+have been checked on a physical iPhone running iOS 26.6.2. **Sending coordinates,
+movement, restoration and Wi-Fi hardware validation remain pending.** Automated
+device tests use controlled doubles; passing them does not prove full phone/OS
+compatibility. No game compatibility is claimed.
 
 ## Install and run
 
@@ -44,6 +47,11 @@ is missing:
 ```sh
 sudo pacman -S --needed usbmuxd libimobiledevice
 ```
+
+If the phone was already connected when usbmuxd was installed, reconnect it so
+the new udev permissions take effect. Verify the service is running before
+scanning. Installing the package alone does not always start it for a device
+that was plugged in earlier.
 
 From this directory, run the per-user installer:
 
@@ -148,8 +156,10 @@ network responses, exercises the real Qt controls and map bridge, and closes its
 window. It writes preview screenshots to `/tmp/locus-linux-*.png`.
 
 Live Photon search and Valhalla walking/cycling/driving requests have also been
-checked during development. Physical iPhone set/refresh/restore, unplug recovery
-and Wi-Fi hardware validation remain pending.
+checked during development. On iOS 26.6.2, physical USB detection, trusted pairing,
+Developer Mode status, developer image preparation and rootless DVT location
+service connect/disconnect passed without sending coordinates. Physical iPhone
+set/refresh/restore, unplug recovery and Wi-Fi hardware validation remain pending.
 
 ## Implementation and licenses
 
