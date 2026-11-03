@@ -24,6 +24,7 @@ from .storage import Places
 from .services import Services, PHOTON, VALHALLA, OVERPASS, endpoint
 from .theme import apply_theme, read_colors
 from .planning import RoutePlan, PROFILES
+from .activation import activate_existing, listen_for_activation
 
 
 def state_directory():
@@ -1146,10 +1147,14 @@ def main():
     state = state_directory()
     state.mkdir(parents=True, exist_ok=True, mode=0o700)
     lock = QLockFile(str(state / ("demo.lock" if options.demo else "app.lock")))
+    activation_name = str(state / ("demo-activation" if options.demo else "activation"))
     if not lock.tryLock(0):
+        if activate_existing(activation_name):
+            return 0
         QMessageBox.information(None, "Locus is already open", "Switch to the existing Locus window to manage your iPhone.")
         return 1
     window = Window(options.demo)
+    window.activation_server = listen_for_activation(activation_name, window)
     window.show()
     return app.exec()
 

@@ -46,7 +46,8 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 - USB pairing/preparation and rootless USB or trusted Wi-Fi iPhone transport.
 - One-second refresh, optional reconnection to the same phone, background drop
   notifications where supported, persistent recovery state and a quit prompt.
-- First-run setup guide and an application-menu installer.
+- First-run setup guide and an application-menu installer. Launching again shows
+  the existing window without opening a second phone session.
 - `--demo` exercises the same desktop interface with fake phone hardware.
 
 This is a development build. USB discovery, preparation, fixed-location refresh,
