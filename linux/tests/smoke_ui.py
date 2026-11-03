@@ -85,6 +85,31 @@ def check():
             stage = 1
         elif stage == 1 and len(window.stops) == 1:
             assert window.map.width() <= collapsed_width - 300
+            tab_geometry = window.tabs.tabBar().geometry()
+            map_geometry = window.map.geometry()
+            for index in range(window.tabs.count()):
+                window.tabs.setCurrentIndex(index)
+                app.processEvents()
+                page = window.tabs.currentWidget()
+                page.verticalScrollBar().setValue(page.verticalScrollBar().maximum())
+                app.processEvents()
+                assert window.tabs.tabBar().geometry() == tab_geometry, 'Navigation must stay pinned'
+                assert window.map.geometry() == map_geometry, 'Switching pages must not shift the map'
+                assert page.horizontalScrollBar().maximum() == 0, 'Controls must fit the panel'
+            window.tabs.setCurrentIndex(0)
+            window.split.setSizes([420, window.split.width() - 424])
+            app.processEvents()
+            panel_width = window.split.sizes()[0]
+            window.sidebar_toggle.setChecked(False)
+            app.processEvents()
+            window.sidebar_toggle.setChecked(True)
+            app.processEvents()
+            assert abs(window.split.sizes()[0] - panel_width) <= 1, 'Reopening must preserve panel width'
+            badge_geometry = window.connection_badge.geometry()
+            window.connection_badge.setText('A much longer connection status that must not move the controls')
+            app.processEvents()
+            assert window.connection_badge.geometry() == badge_geometry
+
             window.map.page().runJavaScript("map.fire('click', {latlng: L.latLng(51.502, -0.122)})")
             stage = 2
         elif stage == 2 and len(window.stops) == 2:

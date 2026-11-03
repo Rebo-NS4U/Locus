@@ -212,7 +212,8 @@ class Window(QMainWindow):
         header.addWidget(self.sidebar_toggle)
         self.sidebar_shortcut = QShortcut(QKeySequence("Ctrl+B"), self)
         self.sidebar_shortcut.activated.connect(self.sidebar_toggle.toggle)
-        self.connection_badge = QLabel("Not connected")
+        self.connection_badge = StatusLabel("Not connected")
+        self.connection_badge.setFixedWidth(240)
         self.connection = QComboBox()
         self.connection.addItem("USB", "usb")
         self.connection.addItem("Wi-Fi", "wifi")
@@ -247,23 +248,23 @@ class Window(QMainWindow):
         split = QSplitter()
         self.split = split
         split.setHandleWidth(4)
-        sidebar = QWidget()
-        side = QVBoxLayout(sidebar)
-        side.setContentsMargins(0, 0, 4, 0)
         self.tabs = QTabWidget()
+        self.tabs.setMinimumWidth(360)
+        self.tabs.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.tabs.setStyleSheet("QWidget { font-size: 13px; } QTabBar::tab { padding: 7px 6px; }")
+        self.tabs.setUsesScrollButtons(False)
         for widget, title in [(self.places_tab(), "Places"), (self.route_tab(), "Route"),
                               (self.movement_tab(), "Move"), (self.map_tab(), "Map"), (self.settings_tab(), "Settings")]:
-            self.tabs.addTab(widget, title)
-        side.addWidget(self.tabs)
-        scroll = QScrollArea()
-        self.sidebar_scroll = scroll
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(sidebar)
-        scroll.setMinimumWidth(340)
-        scroll.hide()
-        sidebar.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
-        split.addWidget(scroll)
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            scroll.setWidget(widget)
+            self.tabs.addTab(scroll, title)
+        self.sidebar_width = 380
+        self.tabs.hide()
+        split.addWidget(self.tabs)
         self.map = QWebEngineView()
         self.map.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
         self.channel = QWebChannel(self.map.page())
@@ -296,11 +297,17 @@ class Window(QMainWindow):
         layout.addLayout(footer)
         self.setCentralWidget(root)
 
+    @property
+    def sidebar_scroll(self):
+        return self.tabs.currentWidget()
+
     def toggle_sidebar(self, visible):
         self.release_keys()
-        self.sidebar_scroll.setVisible(visible)
+        if not visible and self.tabs.isVisible():
+            self.sidebar_width = self.split.sizes()[0]
+        self.tabs.setVisible(visible)
         if visible:
-            self.split.setSizes([340, max(400, self.split.width() - 344)])
+            self.split.setSizes([self.sidebar_width, max(400, self.split.width() - self.sidebar_width - 4)])
         self.store.data["settings"]["sidebar_visible"] = visible
         self.store.save()
         QTimer.singleShot(100, lambda: self.js("map.invalidateSize({pan:false})"))
