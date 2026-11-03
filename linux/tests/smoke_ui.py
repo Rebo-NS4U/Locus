@@ -52,6 +52,7 @@ marked = started
 failure = None
 collapsed_width = None
 errors = []
+gesture_results = []
 traffic_future = None
 window.worker.failed.connect(lambda operation, error: errors.append((operation, error)))
 
@@ -94,9 +95,21 @@ def check():
             window.sidebar_toggle.setChecked(True)
             window.worker.services.requester = fake_request
             window.draw_stops.setChecked(True)
-            window.map.page().runJavaScript("map.fire('click', {latlng: L.latLng(51.5, -0.12)})")
+            window.map.page().runJavaScript("""
+                (() => {
+                    const zoom = map.getZoom();
+                    const event = {latlng: L.latLng(51.5, -0.12)};
+                    // A browser double-click emits two clicks before dblclick.
+                    map.fire('click', event);
+                    map.fire('click', event);
+                    map.fire('dblclick', event);
+                    return !map.doubleClickZoom.enabled() && map.getZoom() === zoom;
+                })()
+            """, gesture_results.append)
             stage = 1
-        elif stage == 1 and len(window.stops) == 1:
+        elif stage == 1 and len(window.stops) == 1 and gesture_results:
+            assert gesture_results == [True], 'Double-click must place one pin without zooming'
+            assert window.worker.session.target is None, 'Double-click must only preview'
             assert window.map.width() <= collapsed_width - 300
             tab_geometry = window.tabs.tabBar().geometry()
             map_geometry = window.map.geometry()
@@ -138,7 +151,7 @@ def check():
             app.processEvents()
             assert window.connection_badge.geometry() == badge_geometry
 
-            window.map.page().runJavaScript("map.fire('click', {latlng: L.latLng(51.502, -0.122)})")
+            window.map.page().runJavaScript("map.fire('dblclick', {latlng: L.latLng(51.502, -0.122)})")
             stage = 2
         elif stage == 2 and len(window.stops) == 2:
             window.draw_stops.setChecked(False)
@@ -177,7 +190,7 @@ def check():
             assert window.sidebar_scroll.horizontalScrollBar().maximum() == 0, 'Sidebar must fit without horizontal clipping'
             window.segment_profile.setCurrentIndex(window.segment_profile.findData('car_roads'))
             window.draw_bends.setChecked(True)
-            window.map.page().runJavaScript("map.fire('click', {latlng: L.latLng(51.5005, -0.1207)})")
+            window.map.page().runJavaScript("map.fire('dblclick', {latlng: L.latLng(51.5005, -0.1207)})")
             stage = 40
         elif stage == 40 and len(window.route_plan.spec(0)['controls']) == 1:
             window.map.page().runJavaScript("bendMarkers[0].setLatLng([51.5006,-0.1206]); bendMarkers[0].fire('dragend')")

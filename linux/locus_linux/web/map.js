@@ -1,4 +1,4 @@
-const map = L.map('map', {worldCopyJump: true}).setView([40.7128, -74.006], 12);
+const map = L.map('map', {worldCopyJump: true, doubleClickZoom: false}).setView([40.7128, -74.006], 12);
 const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
@@ -75,7 +75,7 @@ window.fitRoute = () => {
 };
 new QWebChannel(qt.webChannelTransport, channel => {
   bridge = channel.objects.locus;
-  map.on('click', event => {
+  map.on('dblclick', event => {
     const point = event.latlng.wrap();
     setPin(point.lat, point.lng);
     channel.objects.locus.pick(point.lat, point.lng);

@@ -405,7 +405,7 @@ class Window(QMainWindow):
         box.setContentsMargins(4, 0, 4, 4)
         box.setSpacing(6)
         stops_box = self.group("1 · Route stops", box)
-        self.draw_stops = QCheckBox("Click map to add stops")
+        self.draw_stops = QCheckBox("Double-click map to add stops")
         stops_box.addWidget(self.draw_stops)
         self.stop_list = QListWidget()
         self.stop_list.setFixedHeight(96)
@@ -453,7 +453,7 @@ class Window(QMainWindow):
         self.segment_speed.setSuffix(" km/h")
         speed_row.addWidget(self.segment_speed)
         editor.addLayout(speed_row)
-        self.draw_bends = QCheckBox("Map clicks add bends to this segment")
+        self.draw_bends = QCheckBox("Double-click map to add bends")
         self.draw_bends.toggled.connect(lambda checked: self.draw_stops.setChecked(False) if checked else None)
         self.draw_stops.toggled.connect(lambda checked: self.draw_bends.setChecked(False) if checked else None)
         editor.addWidget(self.draw_bends)
@@ -629,7 +629,7 @@ class Window(QMainWindow):
         for title, body in [
             ("1 · Connect and trust", "Connect your iPhone with a USB data cable, unlock it and accept Trust This Computer. Linux needs usbmuxd and libimobiledevice installed."),
             ("2 · Enable developer access", "Use iOS 17.4 or newer. Enable Developer Mode in Settings → Privacy & Security and restart if prompted. Scan, select the phone and choose Prepare iPhone. First preparation downloads Apple's developer image."),
-            ("3 · Pick a location", "Search, click the map or enter coordinates. These only preview a pin. Set location applies it. Verify the result in Maps on the phone."),
+            ("3 · Pick a location", "Search, double-click the map or enter coordinates. These only preview a pin. Set location applies it. Verify the result in Maps on the phone."),
             ("4 · Move or connect wirelessly", "Use Move for the joystick. In Route, set a profile and Auto/manual speed for each pin-to-pin segment, add or drag bends, then Plan segments. Wi-Fi: restore first, enable it over USB, unplug and scan in Wi-Fi mode."),
             ("5 · Restore before leaving", "Restore real location before disconnecting or quitting. If the connection drops, the location is unknown. Reconnect the same phone to restore; a phone restart may be needed if simulation stays stuck.")]:
             heading = QLabel(title)

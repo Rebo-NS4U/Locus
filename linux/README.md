@@ -113,8 +113,8 @@ select the phone and choose **Prepare iPhone**. Accept the trust prompt. Enable
 Developer Mode under Settings → Privacy & Security and restart if prompted.
 First preparation requires internet to fetch Apple's developer disk image.
 
-Search, select a saved place, click the map or enter coordinates. These preview a
-pin; **Set location** sends it to the selected phone. Check the result in Maps.
+Search, select a saved place, double-click the map or enter coordinates. These preview a
+pin; double-clicking does not zoom or send phone commands. **Set location** sends it to the selected phone. Check the result in Maps.
 Use Move for joystick/imported-GPX speed controls. On Route, add or drag pins,
 select each segment's profile and speed, add/drag bends, then **Plan segments**.
 **All free path** changes every segment to a direct off-road path. You can also
