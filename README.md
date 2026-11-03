@@ -1,5 +1,10 @@
 # Locus
 
+**Linux desktop port:** This fork includes an early native Qt implementation in
+[`linux/`](linux/README.md), with USB iPhone control, map pins, coordinate entry,
+refresh/restore and a hardware-free demo. Joystick and route parity are planned.
+The original iPhone application is documented below.
+
 Free and open-source iPhone location teleport. Tap the map, search a place, or drive a route — Locus injects coordinates through Apple’s **developer location service** into `locationd`, so Maps and other apps see the spoofed GPS (not just a Wi‑Fi lookup that outdoor GPS will overwrite).
 
 <p align="center">

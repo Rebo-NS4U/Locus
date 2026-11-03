@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "locus-linux"
+version = "0.1.0"
+description = "Native Linux companion to Locus (early prototype)"
+requires-python = ">=3.12"
+license = "GPL-3.0-or-later"
+dependencies = ["PySide6==6.10.2", "pymobiledevice3==11.12.4"]
+
+[project.scripts]
+locus-linux = "locus_linux.app:main"
+
+[tool.setuptools.package-data]
+locus_linux = ["web/*", "web/images/*"]
