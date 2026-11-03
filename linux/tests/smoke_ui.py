@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 directory = tempfile.TemporaryDirectory(prefix="locus-ui-")
 os.environ["XDG_STATE_HOME"] = directory.name
+os.environ["XDG_CACHE_HOME"] = directory.name + "/cache"
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog
@@ -72,6 +73,12 @@ def check():
         if stage == 0 and loaded and not window.busy:
             assert window.devices.currentData() == 'demo'
             assert window.colors['accent'].startswith('#')
+            profile = window.map.page().profile()
+            assert not profile.isOffTheRecord()
+            assert profile.httpCacheType() == profile.HttpCacheType.DiskHttpCache
+            assert profile.httpCacheMaximumSize() == 256 * 1024 * 1024
+            assert profile.cachePath() == directory.name + '/cache/locus-linux/demo-map/http'
+            assert 'LocusLinux/' in profile.httpUserAgent()
             assert window.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
             # The shell must retain alpha for compositor blur, while controls
             # and map content remain fully readable (no whole-window opacity).

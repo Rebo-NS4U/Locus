@@ -15,7 +15,9 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
     QSystemTrayIcon, QScrollArea, QGridLayout, QDialog, QSizePolicy, QToolButton, QMenu)
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWebEngineCore import QWebEngineSettings
+from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
+from shiboken6 import delete
+from .map_profile import create_map_profile
 
 from .engine import Session, DemoTransport
 from .device import IPhoneTransport
@@ -285,6 +287,9 @@ class Window(QMainWindow):
         self.tabs.hide()
         split.addWidget(self.tabs)
         self.map = QWebEngineView()
+        self.map_profile = create_map_profile(self.map, demo=self.demo)
+        self.map.setPage(QWebEnginePage(self.map_profile, self.map))
+        QApplication.instance().aboutToQuit.connect(self.release_map)
         self.map.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
         self.channel = QWebChannel(self.map.page())
         self.bridge = MapBridge()
@@ -799,6 +804,11 @@ class Window(QMainWindow):
 
     def preview(self):
         self.js("setPin", self.latitude.value(), self.longitude.value())
+
+    def release_map(self):
+        # Flush the disk cache on exit; Qt requires pages to die first.
+        delete(self.map.page())
+        delete(self.map_profile)
 
     def map_ready(self, ok):
         if ok:

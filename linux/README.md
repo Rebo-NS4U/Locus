@@ -156,8 +156,12 @@ sends planned route geometry to its trace-attributes endpoint. Driving-stop look
 sends road/node IDs to the OpenStreetMap read API for small segments, or to the
 configured Overpass server for larger/custom lookups. The services see
 your IP address and submitted text/area/paths, not device IDs. Playback itself
-sends no routing requests. No autocomplete, bulk tile downloading or offline caching is
-implemented. The night map styles the same tiles locally.
+sends no routing requests. Viewed tiles use a browser HTTP disk cache (up to 256 MiB) under
+`$XDG_CACHE_HOME/locus-linux/map` (default `~/.cache/locus-linux/map`),
+respecting server expiry and revalidation headers. Revisiting cached areas can
+avoid downloading them again, including after relaunch. Demo mode uses a separate
+cache. Delete that directory while Locus is closed to clear it. No autocomplete,
+bulk tile downloading, prefetch or guaranteed offline maps are implemented. The night map styles the same tiles locally.
 
 Photon and Valhalla public demos offer no availability guarantee. Requests are
 explicit, cached and serialized at least 1.1 seconds apart. Configure your own
@@ -179,6 +183,7 @@ Demo mode uses separate files. These personal files are never included in Git.
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/pip check
 .venv/bin/python tests/smoke_ui.py  # requires a graphical session
+.venv/bin/python tests/smoke_map_cache.py  # local-server, cross-launch cache check
 .venv/bin/pip wheel --no-deps -w /tmp/locus-wheels .
 ```
 
