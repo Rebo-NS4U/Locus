@@ -89,8 +89,9 @@ From this directory, run the per-user installer:
 ```
 
 It creates `.venv`, installs the package and adds **Locus Linux** to the application
-menu. It does not install system packages, change desktop configuration or start
-phone simulation. Keep this checkout and its virtual environment at the same
+menu. The desktop entry clears inherited `LD_PRELOAD` libraries so shell helpers
+linked to system Qt cannot conflict with PySide’s bundled Qt. It does not install
+system packages, change desktop configuration or start phone simulation. Keep this checkout and its virtual environment at the same
 path, or rerun the installer after moving them.
 
 Manual installation and demo:

@@ -18,6 +18,8 @@ def install_launcher(data_home=None, executable=None):
     icons.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(Path(__file__).parent / "web/locus.svg", icons / "locus-linux.svg")
     desktop = applications / "locus-linux.desktop"
+    # The shell may preload a helper linked to system Qt. PySide ships its
+    # own Qt, so inheriting that helper fails before Python can start.
     desktop.write_text("[Desktop Entry]\nType=Application\nName=Locus Linux\nComment=iPhone location simulation, routes and joystick\n"
-                       f"Exec={quoted}\nIcon=locus-linux\nTerminal=false\nCategories=Utility;\nStartupWMClass=locus-linux\n")
+                       f"Exec=env -u LD_PRELOAD {quoted}\nIcon=locus-linux\nTerminal=false\nCategories=Utility;\nStartupWMClass=locus-linux\n")
     return desktop

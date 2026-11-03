@@ -27,7 +27,7 @@ class DesktopTests(unittest.TestCase):
     def test_installer_quotes_paths_and_ships_icon(self):
         with tempfile.TemporaryDirectory() as directory:
             desktop = install_launcher(directory, '/tmp/Locus test/bin/locus-linux')
-            self.assertIn('Exec="/tmp/Locus test/bin/locus-linux"', desktop.read_text())
+            self.assertIn('Exec=env -u LD_PRELOAD "/tmp/Locus test/bin/locus-linux"', desktop.read_text())
             self.assertTrue((Path(directory) / 'icons/hicolor/scalable/apps/locus-linux.svg').exists())
             subprocess.run(['desktop-file-validate', str(desktop)], check=True)
 
