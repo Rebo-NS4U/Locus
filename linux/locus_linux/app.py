@@ -253,6 +253,7 @@ class Window(QMainWindow):
         self.tabs.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.tabs.setStyleSheet("QWidget { font-size: 13px; } QTabBar::tab { padding: 7px 6px; }")
         self.tabs.setUsesScrollButtons(False)
+        self.tab_scrolls = []
         for widget, title in [(self.places_tab(), "Places"), (self.route_tab(), "Route"),
                               (self.movement_tab(), "Move"), (self.map_tab(), "Map"), (self.settings_tab(), "Settings")]:
             scroll = QScrollArea()
@@ -261,7 +262,17 @@ class Window(QMainWindow):
             scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             scroll.setWidget(widget)
-            self.tabs.addTab(scroll, title)
+            self.tab_scrolls.append(scroll)
+            if title == "Route":
+                route_page = QWidget()
+                route_layout = QVBoxLayout(route_page)
+                route_layout.setContentsMargins(0, 0, 0, 0)
+                route_layout.setSpacing(4)
+                route_layout.addWidget(scroll, 1)
+                route_layout.addWidget(self.route_footer)
+                self.tabs.addTab(route_page, title)
+            else:
+                self.tabs.addTab(scroll, title)
         self.sidebar_width = 380
         self.tabs.hide()
         split.addWidget(self.tabs)
@@ -299,7 +310,7 @@ class Window(QMainWindow):
 
     @property
     def sidebar_scroll(self):
-        return self.tabs.currentWidget()
+        return self.tab_scrolls[self.tabs.currentIndex()]
 
     def toggle_sidebar(self, visible):
         self.release_keys()
@@ -375,24 +386,38 @@ class Window(QMainWindow):
     def route_tab(self):
         page = QWidget()
         box = QVBoxLayout(page)
-        self.draw_stops = QCheckBox("Add map clicks as route stops")
-        box.addWidget(self.draw_stops)
+        box.setContentsMargins(4, 0, 4, 4)
+        box.setSpacing(6)
+        stops_box = self.group("1 · Route stops", box)
+        self.draw_stops = QCheckBox("Click map to add stops")
+        stops_box.addWidget(self.draw_stops)
         self.stop_list = QListWidget()
-        self.stop_list.setMaximumHeight(110)
-        box.addWidget(self.stop_list)
-        for actions in [[("Add pin", self.add_stop), ("Remove", self.remove_stop), ("Clear", self.clear_route)],
-                        [("Move up", lambda: self.reorder_stop(-1)), ("Move down", lambda: self.reorder_stop(1)), ("Insert pin", self.insert_stop)],
-                        [("Plan segments", self.plan_route), ("All free path", self.use_drawn_route)]]:
-            row = QHBoxLayout()
-            for label, callback in actions:
-                self.button(label, callback, row)
-            box.addLayout(row)
+        self.stop_list.setFixedHeight(96)
+        self.stop_list.setToolTip("Select a stop to insert after it, remove it or change its order. Drag map pins to reposition them.")
+        stops_box.addWidget(self.stop_list)
+        row = QHBoxLayout()
+        for label, callback, tip in [
+                ("Add", self.add_stop, "Append the preview pin as a stop"),
+                ("Insert", self.insert_stop, "Insert the preview pin after the selected stop"),
+                ("Remove", self.remove_stop, "Remove the selected stop")]:
+            self.button(label, callback, row).setToolTip(tip)
+        for label, direction in [("↑", -1), ("↓", 1)]:
+            button = QToolButton()
+            button.setText(label)
+            button.setFixedWidth(28)
+            button.setStyleSheet("padding: 7px 0;")
+            button.setToolTip("Move selected stop " + ("up" if direction < 0 else "down"))
+            button.setAccessibleName(button.toolTip())
+            button.clicked.connect(lambda checked=False, step=direction: self.reorder_stop(step))
+            row.addWidget(button)
+        stops_box.addLayout(row)
+        box.addWidget(QLabel("2 · Select a segment"))
         self.segment_list = QListWidget()
-        self.segment_list.setMaximumHeight(100)
+        self.segment_list.setFixedHeight(80)
+        self.segment_list.setToolTip("Select a segment here or click its path on the map")
         self.segment_list.currentRowChanged.connect(self.select_segment)
-        box.addWidget(QLabel("Segments between pins"))
         box.addWidget(self.segment_list)
-        self.segment_group = QGroupBox("Selected segment")
+        self.segment_group = QGroupBox("3 · Shape & speed")
         editor = QVBoxLayout(self.segment_group)
         self.segment_profile = QComboBox()
         self.segment_profile.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
@@ -432,31 +457,51 @@ class Window(QMainWindow):
         self.route_options.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.route_options.setMinimumContentsLength(12)
         self.route_options.currentIndexChanged.connect(self.choose_route)
-        box.addWidget(self.route_options)
-        self.route_summary = QLabel("Add two stops, or import a GPX route.")
-        self.route_summary.setWordWrap(True)
-        box.addWidget(self.route_summary)
-        row = QHBoxLayout()
-        self.button("Import GPX", self.import_gpx, row)
-        self.button("Export GPX", self.export_gpx, row)
-        box.addLayout(row)
-        row = QHBoxLayout()
-        self.button("Save route project", self.save_project, row)
-        self.button("Load project", self.load_project, row)
-        box.addLayout(row)
-        self.loop_route = QCheckBox("Loop route (restart at first point)")
-        box.addWidget(self.loop_route)
-        row = QHBoxLayout()
-        self.button("Start route", self.start_route, row, True).setObjectName("primary")
-        self.button("Pause", lambda: self.request("control", "pause"), row, True)
-        self.button("Resume", lambda: self.request("control", "resume"), row, True)
-        box.addLayout(row)
-        self.progress = QLabel("Not following a route")
-        box.addWidget(self.progress)
-        note = QLabel("Choose a profile per segment. Drag numbered pins or bend markers to reshape it, then Plan segments. Mapped trails/sidewalks/tracks are preferences based on OpenStreetMap; free paths follow your bends exactly.")
+        self.route_options.setPlaceholderText("Plan to compare paths")
+        self.route_options.setToolTip("Alternative paths for the selected segment")
+        editor.addWidget(self.route_options)
+        note = QLabel("Drag pins and bends on the map, then replan. Free paths follow bends exactly.")
         note.setWordWrap(True)
         note.setObjectName("subtitle")
         box.addWidget(note)
+        # Keep planning and playback reachable while the editor scrolls.
+        self.route_footer = QWidget()
+        footer = QVBoxLayout(self.route_footer)
+        footer.setContentsMargins(4, 4, 4, 0)
+        footer.setSpacing(4)
+        row = QHBoxLayout()
+        self.plan_button = self.button("Plan route", self.plan_route, row)
+        self.plan_button.setObjectName("primary")
+        self.plan_button.setToolTip("Plan all segments using their profiles, bends and speed settings")
+        self.route_file_button = QToolButton()
+        self.route_file_button.setText("Route ⋯")
+        self.route_file_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.route_menu = QMenu(self.route_file_button)
+        for label, callback in [("Import GPX…", self.import_gpx), ("Export GPX…", self.export_gpx),
+                                ("Load project…", self.load_project), ("Save project…", self.save_project)]:
+            self.route_menu.addAction(label, callback)
+        self.route_menu.addSeparator()
+        self.route_menu.addAction("Use free paths for all segments", self.use_drawn_route)
+        self.route_menu.addAction("Clear route", self.clear_route)
+        self.route_file_button.setMenu(self.route_menu)
+        row.addWidget(self.route_file_button)
+        footer.addLayout(row)
+        self.route_summary = StatusLabel("Add two stops, or import GPX from Route ⋯.")
+        self.route_summary.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.route_summary.setFixedHeight(22)
+        footer.addWidget(self.route_summary)
+        self.loop_route = QCheckBox("Loop route")
+        self.loop_route.setToolTip("Restart at the first point after reaching the last stop")
+        footer.addWidget(self.loop_route)
+        row = QHBoxLayout()
+        self.button("Start", self.start_route, row, True).setObjectName("primary")
+        self.button("Pause", lambda: self.request("control", "pause"), row, True)
+        self.button("Resume", lambda: self.request("control", "resume"), row, True)
+        footer.addLayout(row)
+        self.progress = StatusLabel("Not following a route")
+        self.progress.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.progress.setFixedHeight(self.progress.fontMetrics().lineSpacing() * 3 + 4)
+        footer.addWidget(self.progress)
         box.addStretch()
         return page
 

@@ -23,6 +23,9 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   text fields and coordinate editors.
 - Walk/run/cycle/drive presets, custom speeds (0.36–360 km/h) and optional ±10%
   variation. Movement and refresh continue while the window is minimized.
+- Route planning keeps Plan, route files and playback pinned below the scrolling
+  editor. Numbered stop/segment/shape sections group editing controls; the Route ⋯
+  menu holds GPX, projects, free paths and clear actions.
 - Up to twelve ordered/draggable pins with separate routing profiles between each
   pair: sidewalks, trails, running/cycling paths, roads, mapped dirt tracks, free
   walking paths and free driving paths. Each segment has its own bends, speed

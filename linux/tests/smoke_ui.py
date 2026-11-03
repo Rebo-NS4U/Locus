@@ -90,12 +90,27 @@ def check():
             for index in range(window.tabs.count()):
                 window.tabs.setCurrentIndex(index)
                 app.processEvents()
-                page = window.tabs.currentWidget()
+                page = window.sidebar_scroll
                 page.verticalScrollBar().setValue(page.verticalScrollBar().maximum())
                 app.processEvents()
                 assert window.tabs.tabBar().geometry() == tab_geometry, 'Navigation must stay pinned'
                 assert window.map.geometry() == map_geometry, 'Switching pages must not shift the map'
                 assert page.horizontalScrollBar().maximum() == 0, 'Controls must fit the panel'
+            window.tabs.setCurrentIndex(1)
+            app.processEvents()
+            footer_geometry = window.route_footer.geometry()
+            for value in (0, window.sidebar_scroll.verticalScrollBar().maximum()):
+                window.sidebar_scroll.verticalScrollBar().setValue(value)
+                app.processEvents()
+                assert window.route_footer.geometry() == footer_geometry, 'Route actions must stay pinned'
+                assert window.plan_button.isVisible()
+            original_size = window.size()
+            window.resize(900, 600)
+            app.processEvents()
+            assert window.route_footer.geometry().bottom() < window.tabs.currentWidget().height()
+            assert window.sidebar_scroll.height() > 150, 'Editor must remain usable in a small window'
+            assert window.progress.height() >= window.progress.fontMetrics().lineSpacing() * 3
+            window.resize(original_size)
             window.tabs.setCurrentIndex(0)
             window.split.setSizes([420, window.split.width() - 424])
             app.processEvents()
