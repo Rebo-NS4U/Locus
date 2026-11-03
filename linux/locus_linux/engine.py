@@ -38,11 +38,14 @@ class Session:
         self.last_ack = None
         self.next_retry = 0
         self.last_tick = time.monotonic()
+        self.motion_speed = 0.0
 
     def snapshot(self):
         return {"mode": self.mode, "paused": self.paused, "position": self.last_ack,
                 "connected": self.target is not None, "progress": self.progress,
-                "total": self.route.total if self.route and self.mode == "route" else 0}
+                "total": self.route.total if self.route and self.mode == "route" else 0,
+                "speed_kph": self.motion_speed * 3.6,
+                "speed_source": self.route.sources[self.route.edge_at(self.progress)] if self.route and self.route.sources and self.mode == "route" else "manual / global"}
 
     async def configure(self, speed, variation, reconnect):
         if not math.isfinite(speed) or not 0.1 <= speed <= 100:
@@ -51,13 +54,14 @@ class Session:
             self.speed, self.variation, self.reconnect = speed, bool(variation), bool(reconnect)
         return "Movement settings updated."
 
-    async def start_route(self, device, points, loop=False):
+    async def start_route(self, device, points, loop=False, profile=None):
         from .routes import Route
-        route = Route(points)
+        route = Route(points, **(profile or {}))
         await self.apply(device, *route.points[0])
         async with self.lock:
             self.route, self.progress, self.loop_route = route, 0, bool(loop)
             self.mode, self.paused = "route", False
+            self.motion_speed = 0 if not route.speeds or (route.driving and route.driving[0]) else route.speeds[0]
             self.last_tick = time.monotonic()
             self.changed(self.snapshot())
         return "Following route. Pause holds the current location."
@@ -66,8 +70,10 @@ class Session:
         async with self.lock:
             if action == "hold":
                 self.mode, self.vector = "fixed", (0, 0)
+                self.motion_speed = 0
             elif action == "pause":
                 self.paused = True
+                self.motion_speed = 0
                 if self.mode == "joystick":
                     self.mode, self.vector = "fixed", (0, 0)
             elif action == "resume":
@@ -88,6 +94,7 @@ class Session:
         async with self.lock:
             if east == 0 and north == 0:
                 self.vector = (0, 0)
+                self.motion_speed = 0
                 if self.mode == "joystick":
                     self.mode = "fixed"
                 self.changed(self.snapshot())
@@ -126,6 +133,7 @@ class Session:
             self.device, self.target = device, target
             self.last_target = target
             self.mode, self.vector = "fixed", (0, 0)
+            self.motion_speed = 0
             try:
                 await self.transport.set(device, *target)
             except BaseException:
@@ -163,13 +171,30 @@ class Session:
                 meters = speed * max(0, min(elapsed, 2))
                 if self.mode == "joystick":
                     candidate = offset(candidate, self.vector[0] * meters, self.vector[1] * meters)
+                    self.motion_speed = speed * math.hypot(*self.vector)
                 elif self.mode == "route" and not self.paused:
                     if self.progress >= self.route.total and self.loop_route:
                         self.progress = 0
-                    self.progress = min(self.route.total, self.progress + meters)
+                    previous = self.progress
+                    if self.route.speeds:
+                        duration = max(0, min(elapsed, 2))
+                        edge = self.route.edge_at(self.progress)
+                        automatic = self.route.driving and self.route.driving[edge]
+                        factor = random.uniform(.9, 1 if automatic else 1.1) if self.variation else 1
+                        desired = self.route.desired_speed(self.progress) * factor
+                        if automatic:
+                            cap = min(desired, self.motion_speed + 2 * duration) if desired >= self.motion_speed else max(desired, self.motion_speed - 3 * duration)
+                        else:
+                            cap = desired
+                        self.progress = self.route.advance(self.progress, duration, max(.1, cap), factor)
+                        self.motion_speed = (self.progress - previous) / duration if duration else 0
+                    else:
+                        self.progress = min(self.route.total, self.progress + meters)
+                        self.motion_speed = speed
                     candidate = self.route.at(self.progress)
                     if self.progress >= self.route.total and not self.loop_route:
                         self.paused = True
+                        self.motion_speed = 0
                 if candidate != self.last_target:
                     self.record(self.device, candidate)
                 self.last_target = candidate
@@ -178,6 +203,7 @@ class Session:
             except Exception as error:
                 first_failure = self.target is not None
                 self.target, self.paused, self.vector = None, True, (0, 0)
+                self.motion_speed = 0
                 self.next_retry = now + 5
                 if first_failure:
                     self.notify(f"Connection interrupted; location is unknown. Retrying the same iPhone: {error}")
@@ -198,6 +224,7 @@ class Session:
                 raise RuntimeError("Select the iPhone that owns the unresolved session.")
             self.target = None
             self.paused, self.vector = True, (0, 0)
+            self.motion_speed = 0
             if self.refresh:
                 self.refresh.cancel()
             # Never remove the recovery record if clear/teardown fails.

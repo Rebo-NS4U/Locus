@@ -1,4 +1,4 @@
-# Locus for Linux 0.2
+# Locus for Linux 0.3
 
 A native PySide6/Qt desktop companion to the original Locus iPhone application.
 It controls a connected iPhone; it does not change the Linux computer's location.
@@ -19,10 +19,17 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   text fields and coordinate editors.
 - Walk/run/cycle/drive presets, custom speeds (0.36–360 km/h) and optional ±10%
   variation. Movement and refresh continue while the window is minimized.
-- Up to twelve ordered/draggable route stops; pedestrian, bicycle or driving
-  routes from Valhalla, with alternatives when available. Run uses pedestrian
-  routing. The route planner's time estimate is distinct from the selected
-  playback speed.
+- Up to twelve ordered/draggable pins with separate routing profiles between each
+  pair: sidewalks, trails, running/cycling paths, roads, mapped dirt tracks, free
+  walking paths and free driving paths. Each segment has its own bends, speed
+  policy and alternatives. Insert a pin to split a segment and inherit its settings.
+- Automatic driving speed from mapped road speeds/limits and surface information,
+  with acceleration and braking toward turns/lower limits. Missing data is labeled
+  as an estimate. Manual speed overrides are available per segment. This estimates
+  simulated movement; it does not sense the phone's actual vehicle speed or live traffic.
+- Colored, clickable segments and draggable bend handles; right-click a bend to
+  remove it. Editable `.locus.json` route projects retain pins, profiles, bends and
+  speed settings. See the [mixed-routing guide](docs/routing.md).
 - Explicit drawn-path mode and GPX import/export for up to 50,000 points. They
   follow their exact geometry, including off-road sections. GPX import accepts
   one track segment or route at a time and rejects separated segments rather
@@ -90,8 +97,10 @@ First preparation requires internet to fetch Apple's developer disk image.
 
 Search, select a saved place, click the map or enter coordinates. These preview a
 pin; **Set location** sends it to the selected phone. Check the result in Maps.
-Use Move for joystick/speed controls. On Route, add or drag stops and plan roads,
-choose **Use drawn path**, or import GPX. Then explicitly choose **Start route**.
+Use Move for joystick/imported-GPX speed controls. On Route, add or drag pins,
+select each segment's profile and speed, add/drag bends, then **Plan segments**.
+**All free path** changes every segment to a direct off-road path. You can also
+import GPX. Explicitly choose **Start route** to apply movement to the phone.
 
 For Wi-Fi, first restore any active session, select USB and choose **Enable Wi-Fi
 over USB**. It saves the trusted pairing and enables wireless connections. Unplug
@@ -125,9 +134,10 @@ with unresolved state.
 
 The map is local bundled Leaflet inside Qt WebEngine. There is no HTTP control
 server. Map views request OpenStreetMap tiles; submitted searches go to Photon;
-route planning sends selected stops to Valhalla. The services see your IP address
-and the submitted text/area/stops, not device IDs. Playback itself sends no
-routing requests. No autocomplete, bulk tile downloading or offline caching is
+route planning sends selected stops/bends to Valhalla, and driving speed lookup
+sends planned route geometry to its trace-attributes endpoint. The services see
+your IP address and submitted text/area/paths, not device IDs. Playback itself
+sends no routing requests. No autocomplete, bulk tile downloading or offline caching is
 implemented. The night map styles the same tiles locally.
 
 Photon and Valhalla public demos offer no availability guarantee. Requests are
@@ -155,6 +165,8 @@ Demo mode uses separate files. These personal files are never included in Git.
 
 Tests cover movement geometry, date-line/polar behavior, speed/loop/pause/restore,
 sleep and reconnection, recovery ownership, cancellation, GPX parsing/export,
+mixed profiles, project round trips, stale-result protection, pin insertion,
+mapped speed limits/surface caps, turn braking, acceleration and speed boundaries,
 place persistence, service adapters, Wi-Fi identity/heartbeat/cleanup, desktop
 theme parsing and launcher creation. The native smoke test uses fake phone and
 network responses, exercises the real Qt controls and map bridge, and closes its

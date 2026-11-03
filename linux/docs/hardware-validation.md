@@ -45,6 +45,11 @@ doubles, which is not a replacement for this hardware check.
 
 ## Still pending
 
+The 0.3 mixed-segment planner and automatic driving speeds were verified with
+automated motion tests, the native demo editor and live public routing/speed-data
+requests. They have not been separately re-tested on the physical phone. The USB
+command tests above describe the earlier controller workflow.
+
 - Independent observation of the selected and cleared location inside a phone app.
 - Physical cable unplug/replug during an active session and clear after recovery.
 - Wi-Fi set/refresh/clear on a discoverable phone, and restoration after a Wi-Fi loss.

@@ -44,7 +44,7 @@ def interpolate(a, b, fraction):
 
 
 class Route:
-    def __init__(self, points):
+    def __init__(self, points, speeds=None, sources=None, driving=None):
         if not 2 <= len(points) <= MAX_POINTS:
             raise ValueError(f"A route needs 2–{MAX_POINTS} points.")
         self.points = [coordinates(*p) for p in points]
@@ -56,6 +56,59 @@ class Route:
         self.total = self.lengths[-1]
         if self.total < 0.01:
             raise ValueError("Route points must have different locations.")
+        self.speeds = list(speeds) if speeds is not None else None
+        self.sources = list(sources) if sources is not None else None
+        self.driving = list(driving) if driving is not None else None
+        for values in (self.speeds, self.sources, self.driving):
+            if values is not None and len(values) != len(self.points) - 1:
+                raise ValueError("Speed metadata must match every route edge")
+        if self.speeds is not None and any(not isinstance(s, (int, float)) or not math.isfinite(s) or not .1 <= s <= 100 for s in self.speeds):
+            raise ValueError("Route speeds must be 0.1–100 m/s")
+
+    def edge_at(self, meters):
+        return min(len(self.points) - 2, max(0, bisect.bisect_right(self.lengths, meters) - 1))
+
+    def speed_at(self, meters):
+        return self.speeds[self.edge_at(meters)] if self.speeds is not None else None
+
+    def desired_speed(self, meters):
+        index = self.edge_at(meters)
+        speed = self.speeds[index]
+        if not self.driving or not self.driving[index]:
+            return speed
+        # Brake toward lower limits and sharp turns before reaching them.
+        for edge in range(index + 1, len(self.points) - 1):
+            ahead = self.lengths[edge] - meters
+            if ahead > 150:
+                break
+            cap = self.speeds[edge]
+            a, b, c = self.points[edge - 1:edge + 2]
+            ab, bc, ac = distance(a, b), distance(b, c), distance(a, c)
+            if ab > .1 and bc > .1:
+                cosine = max(-1, min(1, (ab * ab + bc * bc - ac * ac) / (2 * ab * bc)))
+                turn = 180 - math.degrees(math.acos(cosine))
+                if turn > 120:
+                    cap = min(cap, 8 / 3.6)
+                elif turn > 60:
+                    cap = min(cap, 15 / 3.6)
+                elif turn > 30:
+                    cap = min(cap, 25 / 3.6)
+            speed = min(speed, math.sqrt(cap * cap + 2 * 3 * max(0, ahead)))
+        return speed
+
+    def advance(self, meters, seconds, cap, factor=1):
+        # Consume time separately on either side of a mode/speed boundary.
+        while seconds > 1e-9 and meters < self.total:
+            index = self.edge_at(meters)
+            speed = min(cap, self.speeds[index] * factor)
+            remaining = self.lengths[index + 1] - meters
+            if remaining <= 1e-9:
+                meters = self.lengths[index + 1]
+                continue
+            elapsed = min(seconds, remaining / speed)
+            meters = min(self.lengths[index + 1], meters + elapsed * speed)
+            seconds -= elapsed
+        return meters
 
     def at(self, meters):
         if meters <= 0:

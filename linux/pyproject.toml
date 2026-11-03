@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "locus-linux"
-version = "0.2.0"
-description = "Native Linux companion to Locus with routes, joystick and Wi-Fi"
+version = "0.3.0"
+description = "Native Linux Locus with editable mixed-terrain routes and automatic driving speed"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "GPL-3.0-or-later"

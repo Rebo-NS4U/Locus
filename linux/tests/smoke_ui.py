@@ -13,18 +13,30 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog
 from PySide6.QtTest import QTest
 from locus_linux.app import Window
 from locus_linux.routes import parse_gpx, export_gpx
+from locus_linux.services import decode_shape
 from test_features import encode
 
 points = [(51.5, -.12), (51.501, -.121), (51.502, -.122)]
 gpx = Path(directory.name) / 'input.gpx'
 gpx.write_bytes(export_gpx(points))
 exported = Path(directory.name) / 'output.gpx'
+project = Path(directory.name) / 'mixed.locus.json'
 
 
 def fake_request(url, params):
+    if url.endswith('trace_attributes'):
+        shape = params['_json_body']['encoded_polyline']
+        traced = decode_shape(shape)
+        return {'shape': shape, 'edges': [{'begin_shape_index': 0, 'end_shape_index': len(traced) - 1, 'speed': 50, 'speed_limit': 30, 'surface': 'paved_smooth'}]}
     if 'q' in params:
         return {'features': [{'geometry': {'coordinates': [-.12, 51.5]}, 'properties': {'name': 'Westminster', 'city': 'London'}}]}
-    trip = {'status': 0, 'legs': [{'shape': encode(points)}], 'summary': {'time': 120}}
+    import json
+    locations = json.loads(params['json'])['locations']
+    route = [(p['lat'], p['lon']) for p in locations]
+    if len(route) == 2:
+        a, b = route
+        route = [a, ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2), b]
+    trip = {'status': 0, 'legs': [{'shape': encode(route)}], 'summary': {'time': 120}}
     return {'trip': trip, 'alternates': [{'trip': {**trip, 'summary': {'time': 150}}}]}
 
 
@@ -106,7 +118,49 @@ def check():
             window.route_options.setCurrentIndex(1)
             assert window.route_points == points
             assert window.sidebar_scroll.horizontalScrollBar().maximum() == 0, 'Sidebar must fit without horizontal clipping'
+            window.segment_profile.setCurrentIndex(window.segment_profile.findData('car_roads'))
+            window.draw_bends.setChecked(True)
+            window.map.page().runJavaScript("map.fire('click', {latlng: L.latLng(51.5005, -0.1207)})")
+            stage = 40
+        elif stage == 40 and len(window.route_plan.spec(0)['controls']) == 1:
+            window.map.page().runJavaScript("bendMarkers[0].setLatLng([51.5006,-0.1206]); bendMarkers[0].fire('dragend')")
+            stage = 41
+        elif stage == 41 and all(abs(a - b) < 1e-8 for a, b in zip(window.route_plan.spec(0)['controls'][0], (51.5006, -.1206))):
+            window.draw_bends.setChecked(False)
+            window.pick(51.501, -.121)
+            window.stop_list.setCurrentRow(0)
+            window.insert_stop()
+            assert len(window.stops) == 3
+            assert window.route_plan.spec(0)['profile'] == 'car_roads'
+            window.segment_list.setCurrentRow(1)
+            window.segment_profile.setCurrentIndex(window.segment_profile.findData('walk_trails'))
+            window.pick(51.503, -.123)
+            window.add_stop()
+            window.segment_list.setCurrentRow(2)
+            window.segment_profile.setCurrentIndex(window.segment_profile.findData('offroad_car'))
+            window.segment_speed_mode.setCurrentIndex(window.segment_speed_mode.findData('manual'))
+            window.segment_speed.setValue(12)
+            window.plan_route()
+            stage = 42
+        elif stage == 42 and not window.busy:
+            assert len(window.route_plan.results) == 3
+            assert any('limit 30' in source for source in window.route_profile['sources'])
+            assert window.route_plan.spec(2)['speed_kph'] == 12
+            with patch.object(QFileDialog, 'getSaveFileName', return_value=(str(project), '')):
+                window.save_project()
+            assert project.exists()
+            with patch.object(QFileDialog, 'getOpenFileName', return_value=(str(project), '')):
+                window.load_project()
+            assert [window.route_plan.spec(i)['profile'] for i in range(3)] == ['car_roads', 'walk_trails', 'offroad_car']
+            window.plan_route()
+            stage = 43
+        elif stage == 43 and not window.busy:
+            window.segment_list.setCurrentRow(0)
+            assert window.route_options.count() == 2
             window.perform('prepare')
+            before = len(window.stops)
+            window.add_stop()
+            assert len(window.stops) == before, 'A pending phone operation must block route edits'
             stage = 5
         elif stage == 5 and not window.busy:
             assert 'Demo ready' in window.status.text()

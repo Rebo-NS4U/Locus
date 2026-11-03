@@ -3,13 +3,13 @@ const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
 tiles.on('tileerror', () => { document.getElementById('notice').hidden = false; });
-let marker, acknowledged, routeLine, bridge, stopMarkers = [], follow = true;
+let marker, acknowledged, routeLine, bridge, stopMarkers = [], bendMarkers = [], follow = true;
 let palette = {accent: '#ffb77e', text: '#efdfd6', bg: '#423429'};
 window.setTheme = colors => {
   palette = colors;
   for (const [key, value] of Object.entries(colors)) document.documentElement.style.setProperty('--' + key, value);
   if (marker) marker.setStyle({color: palette.accent});
-  if (routeLine) routeLine.setStyle({color: palette.accent});
+  if (routeLine) routeLine.eachLayer(layer => layer.setStyle({color: layer.options.segmentColor || palette.accent}));
 };
 window.setOptions = (night, shouldFollow) => {
   document.body.classList.toggle('night', night);
@@ -32,9 +32,28 @@ window.setAcknowledged = (point, connected) => {
   acknowledged.bindTooltip(connected ? 'Last acknowledged location' : 'Last acknowledged location · connection lost');
   if (follow && connected) map.panTo(point, {animate: true, duration: 0.3});
 };
-window.setRoute = (points, stops) => {
+window.setRoute = (points, stops, segments = [], selected = -1) => {
   if (routeLine) routeLine.remove();
-  routeLine = L.polyline(points.length ? points : stops, {color: palette.accent, weight: 4, opacity: points.length ? 0.9 : 0.45, dashArray: points.length ? null : '6,8'}).addTo(map);
+  routeLine = L.featureGroup().addTo(map);
+  const pieces = segments.length ? segments : [{points: points.length ? points : stops, ready: Boolean(points.length), color: palette.accent, controls: [], label: 'Route'}];
+  bendMarkers.forEach(item => item.remove());
+  bendMarkers = [];
+  pieces.forEach((segment, index) => {
+    const line = L.polyline(segment.points, {segmentColor: segment.color, color: segment.color, weight: index === selected ? 6 : 4, opacity: segment.ready ? 0.9 : 0.5, dashArray: segment.ready ? null : '6,8', bubblingMouseEvents: false}).addTo(routeLine);
+    line.bindTooltip(`${index + 1} → ${index + 2} · ${segment.label}${segment.ready ? '' : ' · needs planning'}`);
+    if (segments.length) line.on('click', () => { if (bridge) bridge.selectLeg(index); });
+    (segment.connectors || []).forEach(connector => L.polyline(connector, {segmentColor: '#efdfd6', color: '#efdfd6', weight: 4, dashArray: '3,5'}).bindTooltip('Short connector from pin to mapped path').addTo(routeLine));
+    if (index === selected) (segment.controls || []).forEach((point, bend) => {
+      const handle = L.marker(point, {draggable: true, icon: L.divIcon({className: 'route-bend', html: '', iconSize: [14,14], iconAnchor: [7,7]})}).addTo(map);
+      handle.bindTooltip('Drag to reshape · right-click to remove bend');
+      handle.on('dragend', () => {
+        const moved = handle.getLatLng().wrap();
+        if (bridge) bridge.moveBend(index, bend, moved.lat, moved.lng);
+      });
+      handle.on('contextmenu', () => { if (bridge) bridge.deleteBend(index, bend); });
+      bendMarkers.push(handle);
+    });
+  });
   stopMarkers.forEach(item => item.remove());
   stopMarkers = stops.map((point, index) => {
     const stop = L.marker(point, {draggable: true, icon: L.divIcon({className: 'route-stop', html: String(index + 1), iconSize: [24, 24], iconAnchor: [12, 12]})}).addTo(map);
@@ -46,7 +65,7 @@ window.setRoute = (points, stops) => {
   });
 };
 window.fitRoute = () => {
-  if (routeLine && routeLine.getLatLngs().length > 1) map.fitBounds(routeLine.getBounds(), {padding: [35, 35]});
+  if (routeLine && routeLine.getBounds().isValid()) map.fitBounds(routeLine.getBounds(), {padding: [35, 35]});
 };
 new QWebChannel(qt.webChannelTransport, channel => {
   bridge = channel.objects.locus;
