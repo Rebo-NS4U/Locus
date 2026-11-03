@@ -4,11 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "locus-linux"
-version = "0.1.0"
-description = "Native Linux companion to Locus (early prototype)"
+version = "0.2.0"
+description = "Native Linux companion to Locus with routes, joystick and Wi-Fi"
+readme = "README.md"
 requires-python = ">=3.12"
 license = "GPL-3.0-or-later"
-dependencies = ["PySide6==6.10.2", "pymobiledevice3==11.12.4"]
+dependencies = ["PySide6==6.10.2", "pymobiledevice3==11.12.4", "requests>=2.32,<3", "packaging>=24", "defusedxml>=0.7.1"]
 
 [project.scripts]
 locus-linux = "locus_linux.app:main"

@@ -1,1 +1,1 @@
-"""Native Linux implementation; see linux/README.md for prototype limits."""
+"""Native Linux implementation; see linux/README.md for hardware validation scope."""

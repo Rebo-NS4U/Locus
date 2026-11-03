@@ -4,23 +4,36 @@ import asyncio
 import json
 import os
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QThread, QUrl, Signal, Slot, Qt, QLockFile
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
-    QHBoxLayout, QLabel, QPushButton, QComboBox, QDoubleSpinBox, QMessageBox)
+from PySide6.QtCore import QObject, QThread, QUrl, Signal, Slot, Qt, QLockFile, QTimer, QEvent
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QLabel, QPushButton, QComboBox, QDoubleSpinBox, QMessageBox, QLineEdit, QListWidget,
+    QTabWidget, QGroupBox, QCheckBox, QSplitter, QFileDialog, QInputDialog,
+    QSystemTrayIcon, QScrollArea, QGridLayout, QDialog, QSizePolicy)
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
 
 from .engine import Session, DemoTransport
 from .device import IPhoneTransport
+from .routes import SPEEDS, Route, parse_gpx, export_gpx
+from .storage import Places
+from .services import Services, PHOTON, VALHALLA, endpoint
+from .theme import apply_theme, read_colors
+
+
+def state_directory():
+    return Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "locus-linux"
 
 
 class Worker(QThread):
     finished_operation = Signal(str, object)
-    failed = Signal(str)
+    failed = Signal(str, str)
     interrupted = Signal(str)
+    state_changed = Signal(object)
     ready = Signal()
 
     def __init__(self, demo):
@@ -30,9 +43,14 @@ class Worker(QThread):
     def run(self):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        data = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "locus-linux"
         self.transport = DemoTransport() if self.demo else IPhoneTransport()
-        self.session = Session(self.transport, data / ("demo-session.json" if self.demo else "session.json"), self.interrupted.emit)
+        self.session = Session(self.transport, state_directory() / ("demo-session.json" if self.demo else "session.json"),
+                               self.interrupted.emit, self.state_changed.emit)
+        if self.session.journal.exists():
+            saved_mode = json.loads(self.session.journal.read_text()).get("transport", "usb")
+            if saved_mode in ("usb", "wifi"):
+                self.transport.mode = saved_mode
+        self.services = Services()
         self.operation_lock = asyncio.Lock()
         self.ready.emit()
         self.loop.run_forever()
@@ -44,17 +62,19 @@ class Worker(QThread):
                 async with self.operation_lock, asyncio.timeout(180):
                     if operation == "discover":
                         result = await self.transport.discover()
-                    elif operation == "prepare":
-                        result = await self.transport.prepare(*args)
-                    elif operation == "apply":
-                        result = await self.session.apply(*args)
-                    elif operation == "restore":
-                        result = await self.session.restore(*args)
+                    elif operation in ("prepare", "enable_wifi", "set_mode"):
+                        if self.session.journal.exists():
+                            raise ValueError("Restore the current session before changing device setup or transport.")
+                        result = await getattr(self.transport, operation)(*args)
+                    elif operation in ("apply", "restore", "configure", "start_route", "control", "joystick"):
+                        result = await getattr(self.session, operation)(*args)
+                    elif operation in ("search", "route"):
+                        result = await getattr(self.services, operation)(*args)
                     else:
                         raise ValueError("Unknown operation")
                 self.finished_operation.emit(operation, result)
             except Exception as error:
-                self.failed.emit(str(error) or type(error).__name__)
+                self.failed.emit(operation, str(error) or type(error).__name__)
         asyncio.run_coroutine_threadsafe(execute(), self.loop)
 
     def stop(self):
@@ -71,130 +91,701 @@ class Worker(QThread):
 
 class MapBridge(QObject):
     picked = Signal(float, float)
+    stop_moved = Signal(int, float, float)
 
     @Slot(float, float)
     def pick(self, latitude, longitude):
         self.picked.emit(latitude, longitude)
 
+    @Slot(int, float, float)
+    def moveStop(self, index, latitude, longitude):
+        self.stop_moved.emit(index, latitude, longitude)
+
 
 class Window(QMainWindow):
     def __init__(self, demo):
         super().__init__()
-        self.setWindowTitle("Locus for Linux" + (" — DEMO" if demo else " — Preview"))
-        self.resize(1180, 800)
-        self.busy = True
-        self.closing = False
-        self.exit_after_restore = False
+        self.demo = demo
+        self.colors = apply_theme(QApplication.instance())
+        self.font_stamp = 0
+        self.setWindowTitle("Locus for Linux" + (" — DEMO" if demo else ""))
+        self.setWindowIcon(QIcon(str(Path(__file__).parent / "web/locus.svg")))
+        self.resize(1440, 920)
+        self.setMinimumSize(1000, 680)
+        self.busy, self.ready, self.closing, self.exit_after_restore = True, False, False, False
+        self.stops, self.route_points, self.alternatives = [], [], []
+        self.motion = {"mode": "fixed", "connected": False}
+        self.keys = set()
+        self.joystick_engaged = False
+        self.pending_recent = None
+        self.selected_name = ""
+        self.store = Places(state_directory() / ("demo-places.json" if demo else "places.json"))
         self.worker = Worker(demo)
+        self.foreground_buttons = []
+        self.build_ui()
+        preferences = self.store.data["settings"]
+        self.travel_mode.setCurrentText(preferences.get("travel_mode", "Walk"))
+        self.speed.setValue(preferences.get("speed_kph", self.speed.value()))
+        self.variation.setChecked(preferences.get("variation", False))
+        self.map_style.setCurrentIndex(0 if preferences.get("night_map", True) else 1)
+        self.follow.setChecked(preferences.get("follow", True))
+        self.tray = QSystemTrayIcon(self.windowIcon(), self)
+        self.tray.setToolTip("Locus for Linux")
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            self.tray.show()
+        self.worker.ready.connect(self.started)
+        self.worker.finished_operation.connect(self.completed)
+        self.worker.failed.connect(self.failure)
+        self.worker.interrupted.connect(self.interrupted)
+        self.worker.state_changed.connect(self.motion_changed)
+        self.worker.finished.connect(self.close)
+        self.theme_timer = QTimer(self)
+        self.theme_timer.timeout.connect(self.refresh_theme)
+        self.theme_timer.start(2000)
+        # Scope the filter to widgets, not every QObject: a global Python filter
+        # can re-enter PySide wrapper creation during WebEngine request setup.
+        self.installEventFilter(self)
+        self.map.installEventFilter(self)
+        QApplication.instance().focusChanged.connect(self.focus_changed)
+        self.enable(False)
+        self.worker.start()
+
+    def button(self, label, callback, layout, foreground=False):
+        button = QPushButton(label)
+        button.clicked.connect(callback)
+        layout.addWidget(button)
+        if foreground:
+            self.foreground_buttons.append(button)
+        return button
+
+    def group(self, title, parent):
+        group = QGroupBox(title)
+        layout = QVBoxLayout(group)
+        parent.addWidget(group)
+        return layout
+
+    def build_ui(self):
         root = QWidget()
         layout = QVBoxLayout(root)
-        title = QLabel("Locus  ·  Linux preview" + ("  ·  DEMO: no phone commands" if demo else ""))
-        title.setStyleSheet("font-size: 24px; font-weight: 600; padding: 12px;")
-        layout.addWidget(title)
-        row = QHBoxLayout()
+        layout.setContentsMargins(20, 14, 20, 16)
+        layout.setSpacing(12)
+        header = QHBoxLayout()
+        title = QLabel("Locus")
+        title.setStyleSheet("font-size: 30px; font-weight: 700;")
+        header.addWidget(title)
+        subtitle = QLabel("Your location, your pace" + ("   ·   DEMO / no phone commands" if self.demo else ""))
+        subtitle.setObjectName("subtitle")
+        subtitle.setWordWrap(True)
+        header.addWidget(subtitle, 1)
+        self.connection_badge = QLabel("Not connected")
+        header.addWidget(self.connection_badge)
+        self.button("Setup guide", self.show_setup, header)
+        layout.addLayout(header)
+        connection = QHBoxLayout()
+        self.connection = QComboBox()
+        self.connection.addItem("USB cable", "usb")
+        self.connection.addItem("Same Wi-Fi", "wifi")
+        self.connection.currentIndexChanged.connect(self.change_transport)
+        connection.addWidget(self.connection)
         self.devices = QComboBox()
-        self.devices.setMinimumWidth(300)
-        row.addWidget(self.devices, 1)
-        self.buttons = []
-        for label, operation in [("Scan USB", "discover"), ("Prepare iPhone", "prepare"), ("Set location", "apply"), ("Restore location", "restore")]:
-            button = QPushButton(label)
-            button.clicked.connect(lambda checked=False, op=operation: self.perform(op))
-            row.addWidget(button)
-            self.buttons.append(button)
-        layout.addLayout(row)
+        self.devices.setMinimumWidth(240)
+        connection.addWidget(self.devices, 1)
+        for label, operation in [("Scan", "discover"), ("Prepare iPhone", "prepare"), ("Enable Wi-Fi over USB", "enable_wifi")]:
+            self.button(label, lambda checked=False, op=operation: self.perform(op), connection, True)
+        layout.addLayout(connection)
+        split = QSplitter()
+        sidebar = QWidget()
+        side = QVBoxLayout(sidebar)
+        side.setContentsMargins(0, 0, 8, 0)
+        self.tabs = QTabWidget()
+        self.tabs.setStyleSheet("QPushButton { font-size: 13px; padding: 8px 9px; } QTabBar::tab { padding: 9px 10px; }")
+        for widget, title in [(self.places_tab(), "Places"), (self.route_tab(), "Route"),
+                              (self.movement_tab(), "Move"), (self.settings_tab(), "Settings")]:
+            self.tabs.addTab(widget, title)
+        side.addWidget(self.tabs)
+        scroll = QScrollArea()
+        self.sidebar_scroll = scroll
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(sidebar)
+        scroll.setMinimumWidth(390)
+        sidebar.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+        split.addWidget(scroll)
+        map_panel = QWidget()
+        panel = QVBoxLayout(map_panel)
+        panel.setContentsMargins(0, 0, 0, 0)
         fields = QHBoxLayout()
         self.latitude, self.longitude = QDoubleSpinBox(), QDoubleSpinBox()
-        for label, field, limit, value in [("Latitude", self.latitude, 90, 40.7128), ("Longitude", self.longitude, 180, -74.006)]:
+        for label, field, limit, value in [("Lat", self.latitude, 90, 40.7128), ("Lon", self.longitude, 180, -74.006)]:
             field.setRange(-limit, limit)
             field.setDecimals(6)
             field.setValue(value)
             fields.addWidget(QLabel(label))
-            fields.addWidget(field)
-        pin = QPushButton("Preview coordinates")
-        pin.clicked.connect(self.preview)
-        fields.addWidget(pin)
-        layout.addLayout(fields)
+            fields.addWidget(field, 1)
+        self.button("Preview pin", self.preview, fields)
+        panel.addLayout(fields)
+        toolbar = QHBoxLayout()
+        self.map_style = QComboBox()
+        self.map_style.addItems(["Night map", "Street map"])
+        self.map_style.currentIndexChanged.connect(self.map_options)
+        toolbar.addWidget(self.map_style)
+        self.follow = QCheckBox("Follow movement")
+        self.follow.setChecked(True)
+        self.follow.toggled.connect(self.map_options)
+        toolbar.addWidget(self.follow)
+        self.button("Fit route", lambda: self.js("fitRoute()"), toolbar)
+        toolbar.addStretch()
+        panel.addLayout(toolbar)
         self.map = QWebEngineView()
         self.map.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
         self.channel = QWebChannel(self.map.page())
         self.bridge = MapBridge()
         self.bridge.picked.connect(self.pick)
+        self.bridge.stop_moved.connect(self.move_stop)
         self.channel.registerObject("locus", self.bridge)
         self.map.page().setWebChannel(self.channel)
+        self.map.loadFinished.connect(self.map_ready)
         self.map.setUrl(QUrl.fromLocalFile(str(Path(__file__).parent / "web/map.html")))
-        layout.addWidget(self.map, 1)
+        panel.addWidget(self.map, 1)
+        actions = QHBoxLayout()
+        self.button("Set location", lambda: self.perform("apply"), actions, True).setObjectName("primary")
+        self.button("Hold / stop movement", lambda: self.request("control", "hold"), actions, True)
+        self.button("Restore real location", lambda: self.perform("restore"), actions, True)
+        panel.addLayout(actions)
+        legend = QLabel("Pin = preview · Solid dot = last acknowledged command · Verify the result in Maps on your iPhone")
+        legend.setWordWrap(True)
+        legend.setObjectName("subtitle")
+        panel.addWidget(legend)
+        split.addWidget(map_panel)
+        split.setSizes([390, 1000])
+        layout.addWidget(split, 1)
         self.status = QLabel("Starting…")
         self.status.setWordWrap(True)
         self.status.setTextFormat(Qt.TextFormat.PlainText)
-        self.status.setStyleSheet("padding: 12px;")
+        self.status.setObjectName("status")
         layout.addWidget(self.status)
-        note = QLabel("Click the map to preview a pin; Set location applies it. USB · iOS 17.4+ · Developer Mode. Map tiles use OpenStreetMap.")
-        note.setWordWrap(True)
-        layout.addWidget(note)
         self.setCentralWidget(root)
-        self.worker.ready.connect(self.started)
-        self.worker.finished_operation.connect(self.completed)
-        self.worker.failed.connect(self.failure)
-        self.worker.interrupted.connect(self.status.setText)
-        self.worker.finished.connect(self.worker_stopped)
-        self.enable(False)
-        self.worker.start()
+
+    def places_tab(self):
+        page = QWidget()
+        box = QVBoxLayout(page)
+        group = self.group("Find a place", box)
+        row = QHBoxLayout()
+        self.search = QLineEdit()
+        self.search.setMinimumWidth(60)
+        self.search.setPlaceholderText("City, address or landmark")
+        self.search.returnPressed.connect(self.search_places)
+        row.addWidget(self.search, 1)
+        self.button("Search", self.search_places, row, True)
+        group.addLayout(row)
+        self.results = QListWidget()
+        self.results.setMaximumHeight(170)
+        self.results.itemClicked.connect(lambda item: self.choose_place(item.data(Qt.ItemDataRole.UserRole)))
+        group.addWidget(self.results)
+        self.saved_tabs = QTabWidget()
+        self.saved = {}
+        for key, label in [("favorites", "Favorites"), ("recents", "Recent")]:
+            widget = QListWidget()
+            widget.itemClicked.connect(lambda item: self.choose_place(item.data(Qt.ItemDataRole.UserRole)))
+            self.saved[key] = widget
+            self.saved_tabs.addTab(widget, label)
+        box.addWidget(self.saved_tabs, 1)
+        row = QHBoxLayout()
+        for label, callback in [("Save pin", self.save_favorite), ("Rename", self.rename_place), ("Remove", self.remove_place)]:
+            self.button(label, callback, row)
+        box.addLayout(row)
+        self.refresh_places()
+        return page
+
+    def route_tab(self):
+        page = QWidget()
+        box = QVBoxLayout(page)
+        self.draw_stops = QCheckBox("Add map clicks as route stops")
+        box.addWidget(self.draw_stops)
+        self.stop_list = QListWidget()
+        self.stop_list.setMaximumHeight(180)
+        box.addWidget(self.stop_list)
+        for actions in [[("Add pin", self.add_stop), ("Remove", self.remove_stop), ("Clear", self.clear_route)],
+                        [("Move up", lambda: self.reorder_stop(-1)), ("Move down", lambda: self.reorder_stop(1))],
+                        [("Plan roads / paths", self.plan_route), ("Use drawn path", self.use_drawn_route)]]:
+            row = QHBoxLayout()
+            for label, callback in actions:
+                self.button(label, callback, row)
+            box.addLayout(row)
+        self.route_options = QComboBox()
+        self.route_options.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.route_options.setMinimumContentsLength(12)
+        self.route_options.currentIndexChanged.connect(self.choose_route)
+        box.addWidget(self.route_options)
+        self.route_summary = QLabel("Add two stops, or import a GPX route.")
+        self.route_summary.setWordWrap(True)
+        box.addWidget(self.route_summary)
+        row = QHBoxLayout()
+        self.button("Import GPX", self.import_gpx, row)
+        self.button("Export GPX", self.export_gpx, row)
+        box.addLayout(row)
+        self.loop_route = QCheckBox("Loop route (restart at first point)")
+        box.addWidget(self.loop_route)
+        row = QHBoxLayout()
+        self.button("Start route", self.start_route, row, True).setObjectName("primary")
+        self.button("Pause", lambda: self.request("control", "pause"), row, True)
+        self.button("Resume", lambda: self.request("control", "resume"), row, True)
+        box.addLayout(row)
+        self.progress = QLabel("Not following a route")
+        box.addWidget(self.progress)
+        note = QLabel("Road planning uses the travel mode in Move. Drawn paths and GPX follow their exact geometry, including off-road sections.")
+        note.setWordWrap(True)
+        note.setObjectName("subtitle")
+        box.addWidget(note)
+        box.addStretch()
+        return page
+
+    def movement_tab(self):
+        page = QWidget()
+        box = QVBoxLayout(page)
+        group = self.group("Travel speed", box)
+        self.travel_mode = QComboBox()
+        self.travel_mode.addItems(SPEEDS)
+        self.travel_mode.currentTextChanged.connect(self.preset_speed)
+        group.addWidget(self.travel_mode)
+        self.speed = QDoubleSpinBox()
+        self.speed.setRange(0.36, 360)
+        self.speed.setDecimals(2)
+        self.speed.setSuffix(" km/h")
+        self.speed.setValue(5.04)
+        self.speed.valueChanged.connect(self.configure_motion)
+        group.addWidget(self.speed)
+        self.variation = QCheckBox("Natural speed variation (±10%)")
+        self.variation.toggled.connect(self.configure_motion)
+        group.addWidget(self.variation)
+        group = self.group("Joystick", box)
+        directions = QGridLayout()
+        for label, x, y, row, col in [("↖", -1, 1, 0, 0), ("↑", 0, 1, 0, 1), ("↗", 1, 1, 0, 2),
+                ("←", -1, 0, 1, 0), ("→", 1, 0, 1, 2), ("↙", -1, -1, 2, 0), ("↓", 0, -1, 2, 1), ("↘", 1, -1, 2, 2)]:
+            button = QPushButton(label)
+            button.setMinimumHeight(44)
+            button.pressed.connect(lambda east=x, north=y: self.joystick(east, north))
+            button.released.connect(lambda: self.joystick(0, 0))
+            directions.addWidget(button, row, col)
+        hold = QPushButton("■")
+        hold.clicked.connect(lambda: self.request("control", "hold"))
+        directions.addWidget(hold, 1, 1)
+        group.addLayout(directions)
+        self.keyboard = QCheckBox("Enable WASD / arrow keys")
+        self.keyboard.toggled.connect(self.release_keys)
+        group.addWidget(self.keyboard)
+        note = QLabel("Set a location first. Hold a direction to move; release to hold position. Keyboard controls stay off while typing or editing coordinates.")
+        note.setWordWrap(True)
+        group.addWidget(note)
+        box.addStretch()
+        return page
+
+    def settings_tab(self):
+        page = QWidget()
+        box = QVBoxLayout(page)
+        group = self.group("Connection and recovery", box)
+        self.reconnect = QCheckBox("Reconnect the same iPhone after a drop")
+        self.reconnect.setChecked(self.store.data["settings"].get("reconnect", True))
+        self.reconnect.toggled.connect(self.configure_motion)
+        group.addWidget(self.reconnect)
+        self.notifications = QCheckBox("Notify when a connection drops")
+        self.notifications.setChecked(self.store.data["settings"].get("notifications", True))
+        group.addWidget(self.notifications)
+        label = QLabel("After reconnecting, routes remain paused. Saved sessions never restart automatically after reopening Locus.")
+        label.setWordWrap(True)
+        group.addWidget(label)
+        group = self.group("Map services", box)
+        group.addWidget(QLabel("Photon search endpoint"))
+        self.photon = QLineEdit(self.store.data["settings"].get("photon", PHOTON))
+        group.addWidget(self.photon)
+        group.addWidget(QLabel("Valhalla route endpoint"))
+        self.valhalla = QLineEdit(self.store.data["settings"].get("valhalla", VALHALLA))
+        group.addWidget(self.valhalla)
+        self.button("Save settings", self.save_settings, group)
+        for text in ["Search sends submitted text to Photon. Route planning sends stops to Valhalla. Map views fetch OpenStreetMap tiles. Phone identifiers, favorites and session state stay on this computer.",
+                     "Appearance follows your Qt desktop colors and font. iOS 17.4+ and Developer Mode are required."]:
+            label = QLabel(text)
+            label.setWordWrap(True)
+            group.addWidget(label)
+        box.addStretch()
+        return page
 
     def started(self):
-        self.busy = False
+        self.ready, self.busy = True, False
+        self.connection.blockSignals(True)
+        self.connection.setCurrentIndex(self.connection.findData(self.worker.transport.mode))
+        self.connection.blockSignals(False)
+        self.configure_motion()
         self.perform("discover")
+        if not self.demo and not self.store.data["settings"].get("setup_seen"):
+            QTimer.singleShot(400, self.show_setup)
+
+    def show_setup(self):
+        if hasattr(self, "setup_dialog") and self.setup_dialog.isVisible():
+            self.setup_dialog.raise_()
+            return
+        self.setup_dialog = QDialog(self)
+        self.setup_dialog.setWindowTitle("Set up Locus")
+        self.setup_dialog.resize(560, 480)
+        layout = QVBoxLayout(self.setup_dialog)
+        for title, body in [
+            ("1 · Connect and trust", "Connect your iPhone with a USB data cable, unlock it and accept Trust This Computer. Linux needs usbmuxd and libimobiledevice installed."),
+            ("2 · Enable developer access", "Use iOS 17.4 or newer. Enable Developer Mode in Settings → Privacy & Security and restart if prompted. Scan, select the phone and choose Prepare iPhone. First preparation downloads Apple's developer image."),
+            ("3 · Pick a location", "Search, click the map or enter coordinates. These only preview a pin. Set location applies it. Verify the result in Maps on the phone."),
+            ("4 · Move or connect wirelessly", "Use Move for the joystick and speed presets, or Route to draw, plan or import a path. To use Wi-Fi, Restore location first, enable Wi-Fi over USB, unplug and scan in Same Wi-Fi mode."),
+            ("5 · Restore before leaving", "Restore real location before disconnecting or quitting. If the connection drops, the location is unknown. Reconnect the same phone to restore; a phone restart may be needed if simulation stays stuck.")]:
+            heading = QLabel(title)
+            heading.setStyleSheet("font-weight: 600;")
+            label = QLabel(body)
+            label.setWordWrap(True)
+            layout.addWidget(heading)
+            layout.addWidget(label)
+        button = QPushButton("Got it")
+        button.clicked.connect(self.setup_dialog.accept)
+        layout.addWidget(button)
+        def seen():
+            self.store.data["settings"]["setup_seen"] = True
+            self.store.save()
+        self.setup_dialog.accepted.connect(seen)
+        self.setup_dialog.show()
 
     def enable(self, enabled):
         self.devices.setEnabled(enabled)
-        for button in self.buttons:
+        self.connection.setEnabled(enabled)
+        for button in self.foreground_buttons:
             button.setEnabled(enabled)
 
-    def perform(self, operation):
-        if self.busy:
+    def request(self, operation, *args):
+        if self.busy or not self.ready:
             return
+        self.release_keys()
         self.busy = True
         self.enable(False)
         self.status.setText("Working…" + (" Unlock the phone and accept Trust if prompted. First preparation downloads Apple's developer image." if operation == "prepare" else ""))
+        self.worker.submit(operation, *args)
+
+    def perform(self, operation):
         args = [] if operation == "discover" else [self.devices.currentData()]
         if operation == "apply":
             args += [self.latitude.value(), self.longitude.value()]
-        self.worker.submit(operation, *args)
+            self.pending_recent = {"name": self.selected_name, "point": args[1:]}
+        self.request(operation, *args)
 
     def completed(self, operation, result):
+        if operation in ("configure", "joystick"):
+            return
         self.busy = False
         self.enable(True)
         if operation == "discover":
+            selected = self.devices.currentData()
             self.devices.clear()
             for device, name in result:
                 self.devices.addItem(name, device)
+            index = self.devices.findData(selected)
+            if index >= 0:
+                self.devices.setCurrentIndex(index)
             recovery = self.worker.session.journal.exists()
-            self.status.setText(("Unresolved saved session: select its iPhone and Restore location. " if recovery else "") +
-                ("Select your phone, then Prepare iPhone." if result else "No USB iPhone found. Connect a data cable, unlock the phone, and check that usbmuxd is running."))
+            self.status.setText(("Unresolved session: select its iPhone and Restore location. " if recovery else "") +
+                ("Select your phone, then Prepare iPhone." if result else "No iPhone found. Connect and unlock it; for Wi-Fi, enable it over USB first and use the same network."))
+        elif operation == "search":
+            self.populate(self.results, result)
+            self.status.setText(f"{len(result)} places found. Select one to preview.")
+        elif operation == "route":
+            self.alternatives = result
+            self.route_options.blockSignals(True)
+            self.route_options.clear()
+            for i, option in enumerate(result):
+                self.route_options.addItem(f"Option {i + 1} · {option['distance'] / 1000:.2f} km · {option['seconds'] / 60:.0f} min")
+            self.route_options.blockSignals(False)
+            self.choose_route(0)
+            self.status.setText("Route planned. Preview it, then Start route.")
+        elif operation == "set_mode":
+            self.devices.clear()
+            self.status.setText(result)
+            self.perform("discover")
         else:
             self.status.setText(result)
+            if operation == "apply" and self.pending_recent:
+                self.store.add("recents", **self.pending_recent)
+                self.refresh_places()
+                self.pending_recent = None
         if operation == "restore" and self.exit_after_restore:
             self.close()
 
-    def failure(self, message):
-        self.busy = False
-        self.exit_after_restore = False
-        self.enable(True)
-        self.status.setText("Operation failed: " + message + " — If a session was active, its location is unknown. Reconnect and Restore location.")
+    def failure(self, operation, message):
+        if operation not in ("configure", "joystick"):
+            self.busy = False
+            self.exit_after_restore = False
+            self.enable(True)
+        if operation == "set_mode":
+            self.connection.blockSignals(True)
+            self.connection.setCurrentIndex(self.connection.findData(self.worker.transport.mode))
+            self.connection.blockSignals(False)
+        self.status.setText(message)
+
+    def interrupted(self, message):
+        self.status.setText(message)
+        if self.notifications.isChecked() and not self.isActiveWindow() and self.tray.isVisible():
+            self.tray.showMessage("Locus connection", message, QSystemTrayIcon.MessageIcon.Warning, 8000)
+
+    def motion_changed(self, state):
+        self.motion = state
+        self.connection_badge.setText(("Demo session" if self.demo else "Location active") if state["connected"] else "Location unknown / inactive")
+        self.connection_badge.setStyleSheet(f"color: {self.colors['accent'] if state['connected'] else self.colors['muted']};")
+        self.js("setAcknowledged", state["position"], state["connected"])
+        self.progress.setText(f"{'Paused / holding' if state['paused'] else 'Following route'} · {state['progress'] / 1000:.2f} / {state['total'] / 1000:.2f} km" if state["total"] else "Not following a route")
+
+    def configure_motion(self, *unused):
+        if self.ready:
+            self.worker.submit("configure", self.speed.value() / 3.6, self.variation.isChecked(), self.reconnect.isChecked())
+
+    def preset_speed(self, mode):
+        if hasattr(self, "speed"):
+            self.speed.setValue(SPEEDS[mode] * 3.6)
+
+    def joystick(self, east, north):
+        if self.ready and not self.busy:
+            self.joystick_engaged = bool(east or north)
+            self.worker.submit("joystick", east, north)
+
+    def release_keys(self, *unused):
+        if self.keys or self.joystick_engaged:
+            self.keys.clear()
+            self.joystick(0, 0)
+
+    def focus_changed(self, previous, current):
+        # A held key may be released in a text field after focus moves. Stop
+        # immediately rather than waiting for that field to forward KeyRelease.
+        self.release_keys()
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.ApplicationDeactivate, QEvent.Type.WindowDeactivate, QEvent.Type.FocusOut):
+            self.release_keys()
+        # These filters are installed only on this window/map. Qt delivers
+        # physical keys to the focused window; deactivation releases movement.
+        if event.type() in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease) and self.keyboard.isChecked():
+            if isinstance(QApplication.focusWidget(), (QLineEdit, QDoubleSpinBox, QComboBox)):
+                return False
+            vectors = {Qt.Key.Key_W: (0, 1), Qt.Key.Key_Up: (0, 1), Qt.Key.Key_A: (-1, 0), Qt.Key.Key_Left: (-1, 0),
+                       Qt.Key.Key_S: (0, -1), Qt.Key.Key_Down: (0, -1), Qt.Key.Key_D: (1, 0), Qt.Key.Key_Right: (1, 0)}
+            key = event.key()
+            if key in vectors and not event.isAutoRepeat():
+                if event.type() == QEvent.Type.KeyPress:
+                    self.keys.add(key)
+                else:
+                    self.keys.discard(key)
+                self.joystick(max(-1, min(1, sum(vectors[k][0] for k in self.keys))), max(-1, min(1, sum(vectors[k][1] for k in self.keys))))
+                return True
+        return super().eventFilter(watched, event)
+
+    def change_transport(self):
+        if self.ready:
+            self.request("set_mode", self.connection.currentData())
 
     def pick(self, latitude, longitude):
         self.latitude.setValue(latitude)
         self.longitude.setValue(longitude)
+        self.selected_name = ""
+        if self.draw_stops.isChecked():
+            self.add_stop()
+
+    def js(self, function, *args):
+        self.map.page().runJavaScript(function if not args else function + "(" + ",".join(json.dumps(arg) for arg in args) + ")")
 
     def preview(self):
-        self.map.page().runJavaScript(f"setPin({json.dumps(self.latitude.value())}, {json.dumps(self.longitude.value())})")
+        self.js("setPin", self.latitude.value(), self.longitude.value())
+
+    def map_ready(self, ok):
+        if ok:
+            if self.map.focusProxy():
+                self.map.focusProxy().installEventFilter(self)
+            self.js("setTheme", self.colors)
+            self.map_options()
+            self.redraw_route()
+
+    def map_options(self, *unused):
+        if hasattr(self, "map"):
+            self.js("setOptions", self.map_style.currentIndex() == 0, self.follow.isChecked())
+
+    def refresh_theme(self):
+        colors = read_colors()
+        config = Path.home() / ".config/qt6ct/qt6ct.conf"
+        stamp = config.stat().st_mtime_ns if config.exists() else 0
+        if colors != self.colors or stamp != self.font_stamp:
+            self.font_stamp = stamp
+            self.colors = apply_theme(QApplication.instance(), colors)
+            self.js("setTheme", colors)
+
+    def search_places(self):
+        self.request("search", self.search.text(), self.store.data["settings"].get("photon", PHOTON))
+
+    def populate(self, widget, places):
+        widget.clear()
+        for place in places:
+            widget.addItem(place["name"])
+            widget.item(widget.count() - 1).setData(Qt.ItemDataRole.UserRole, place)
+
+    def refresh_places(self):
+        for key, widget in self.saved.items():
+            self.populate(widget, self.store.data[key])
+
+    def choose_place(self, place):
+        self.pick(*place["point"])
+        self.selected_name = place["name"]
+        self.preview()
+
+    def save_favorite(self):
+        name, ok = QInputDialog.getText(self, "Save favorite", "Place name", text=self.selected_name)
+        if ok:
+            self.store.add("favorites", name, (self.latitude.value(), self.longitude.value()))
+            self.refresh_places()
+
+    def selected_saved(self):
+        key = "favorites" if self.saved_tabs.currentIndex() == 0 else "recents"
+        return key, self.saved[key].currentRow()
+
+    def rename_place(self):
+        key, index = self.selected_saved()
+        if index >= 0:
+            name, ok = QInputDialog.getText(self, "Rename place", "Place name", text=self.store.data[key][index]["name"])
+            if ok and name.strip():
+                self.store.rename(key, index, name)
+                self.refresh_places()
+
+    def remove_place(self):
+        key, index = self.selected_saved()
+        if index >= 0:
+            self.store.remove(key, index)
+            self.refresh_places()
+
+    def editable_route(self):
+        if self.motion.get("mode") == "route" and self.ready and self.worker.session.journal.exists():
+            self.status.setText("Hold / stop movement before editing this route.")
+            return False
+        return True
+
+    def add_stop(self):
+        if self.editable_route():
+            if len(self.stops) >= 12:
+                self.status.setText("Road routing supports up to 12 stops. Import GPX for longer paths.")
+                return
+            self.stops.append((self.latitude.value(), self.longitude.value()))
+            self.stops_changed()
+
+    def remove_stop(self):
+        index = self.stop_list.currentRow()
+        if index >= 0 and self.editable_route():
+            self.stops.pop(index)
+            self.stops_changed()
+
+    def move_stop(self, index, latitude, longitude):
+        from .engine import coordinates
+        if not self.editable_route():
+            self.redraw_route()
+            return
+        if 0 <= index < len(self.stops):
+            try:
+                self.stops[index] = coordinates(latitude, longitude)
+                self.stops_changed()
+            except ValueError as error:
+                self.status.setText(str(error))
+
+    def reorder_stop(self, direction):
+        index, target = self.stop_list.currentRow(), self.stop_list.currentRow() + direction
+        if self.editable_route() and index >= 0 and 0 <= target < len(self.stops):
+            self.stops[index], self.stops[target] = self.stops[target], self.stops[index]
+            self.stops_changed()
+            self.stop_list.setCurrentRow(target)
+
+    def clear_route(self):
+        if self.editable_route():
+            self.stops = []
+            self.stops_changed()
+
+    def stops_changed(self):
+        self.route_points, self.alternatives = [], []
+        self.route_options.clear()
+        self.stop_list.clear()
+        for i, point in enumerate(self.stops):
+            self.stop_list.addItem(f"{i + 1:02d}   {point[0]:.5f}, {point[1]:.5f}")
+        self.route_summary.setText("Plan a road route or use the drawn path before starting.")
+        self.redraw_route()
+
+    def redraw_route(self):
+        self.js("setRoute", self.route_points, self.stops)
+
+    def use_drawn_route(self):
+        if self.editable_route():
+            try:
+                self.route_points = Route(self.stops).points
+                self.show_route_summary("Drawn path")
+            except ValueError as error:
+                self.status.setText(str(error))
+
+    def show_route_summary(self, source):
+        route = Route(self.route_points)
+        self.route_summary.setText(f"{source} · {route.total / 1000:.2f} km · {len(route.points)} points")
+        self.redraw_route()
+
+    def plan_route(self):
+        if self.editable_route():
+            self.request("route", self.stops.copy(), self.travel_mode.currentText(), self.store.data["settings"].get("valhalla", VALHALLA))
+
+    def choose_route(self, index):
+        if 0 <= index < len(self.alternatives) and self.editable_route():
+            self.route_points = self.alternatives[index]["points"]
+            self.show_route_summary(f"Road option {index + 1}")
+
+    def start_route(self):
+        self.configure_motion()
+        self.request("start_route", self.devices.currentData(), self.route_points.copy(), self.loop_route.isChecked())
+
+    def import_gpx(self):
+        if not self.editable_route():
+            return
+        path, _ = QFileDialog.getOpenFileName(self, "Import route", "", "GPX routes (*.gpx)")
+        if path:
+            try:
+                if Path(path).stat().st_size > 8_000_000:
+                    raise ValueError("GPX is too large (8 MB limit).")
+                points = parse_gpx(Path(path).read_bytes())
+                self.stops = [points[0], points[-1]]
+                self.stops_changed()
+                self.route_points = points
+                self.show_route_summary("Imported GPX")
+                self.js("fitRoute()")
+            except (OSError, ValueError, KeyError, ET.ParseError) as error:
+                self.status.setText(f"Could not import GPX: {error}")
+
+    def export_gpx(self):
+        try:
+            data = export_gpx(self.route_points)
+            path, _ = QFileDialog.getSaveFileName(self, "Export route", "locus-route.gpx", "GPX routes (*.gpx)")
+            if path:
+                Path(path).write_bytes(data)
+                self.status.setText("GPX route exported.")
+        except (OSError, ValueError) as error:
+            self.status.setText(str(error))
+
+    def save_settings(self):
+        try:
+            self.store.data["settings"].update(photon=endpoint(self.photon.text().strip()), valhalla=endpoint(self.valhalla.text().strip()),
+                reconnect=self.reconnect.isChecked(), notifications=self.notifications.isChecked(), travel_mode=self.travel_mode.currentText(),
+                speed_kph=self.speed.value(), variation=self.variation.isChecked(), night_map=self.map_style.currentIndex() == 0, follow=self.follow.isChecked())
+            self.store.save()
+            self.configure_motion()
+            self.status.setText("Settings saved.")
+        except (OSError, ValueError) as error:
+            self.status.setText(str(error))
 
     def closeEvent(self, event):
         if not self.worker.isRunning():
+            self.tray.hide()
             event.accept()
             return
         event.ignore()
         if self.busy or self.closing:
             return
+        self.release_keys()
         if self.worker.session.journal.exists():
             answer = QMessageBox.question(self, "Unresolved iPhone session", "Restore the selected iPhone before quitting?\nChoose No to quit with location unknown and retain the recovery record.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
@@ -209,18 +800,21 @@ class Window(QMainWindow):
         self.enable(False)
         self.worker.stop()
 
-    def worker_stopped(self):
-        self.close()
-
 
 def main():
-    parser = argparse.ArgumentParser(description="Locus native Linux preview")
+    parser = argparse.ArgumentParser(description="Locus native Linux desktop")
     parser.add_argument("--demo", action="store_true", help="Use fake hardware; sends no phone commands")
+    parser.add_argument("--install-launcher", action="store_true", help="Install an application-menu entry for this environment")
     options = parser.parse_args()
+    if options.install_launcher:
+        from .install import install_launcher
+        print(install_launcher())
+        return 0
     app = QApplication(sys.argv[:1])
     app.setApplicationName("Locus Linux")
+    app.setDesktopFileName("locus-linux")
     app.setOrganizationName("Locus")
-    state = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "locus-linux"
+    state = state_directory()
     state.mkdir(parents=True, exist_ok=True, mode=0o700)
     lock = QLockFile(str(state / ("demo.lock" if options.demo else "app.lock")))
     if not lock.tryLock(0):

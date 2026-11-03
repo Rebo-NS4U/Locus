@@ -1,5 +1,9 @@
 # Locus — install & first teleport
 
+**Linux desktop users:** use the [Linux setup guide](linux/README.md). The desktop
+application pairs over USB and does not require sideloading this iPhone app or
+installing LocalDevVPN. The instructions below are for the original iPhone app.
+
 ## 1. Sideload the IPA
 
 Install the latest IPA from [Releases](https://github.com/ChrisMack32/Locus/releases) (or build from source) with Feather, SideStore, AltStore, Sideloadly, or LiveContainer.
