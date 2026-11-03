@@ -66,8 +66,14 @@ result; it cannot silently replace the updated route.
 
 Limits: twelve main pins, ten intermediate bends per mapped segment, a thousand
 per free segment, and fifty thousand combined playback points. Walking/running
-pins must be within two meters of their mapped endpoints; move an off-path pin
-onto the path rather than allowing a straight shortcut across a stream or bank.
+pins normally must be within two meters of their mapped endpoints. For walking,
+when every returned path snaps both stops more than two meters from their requested
+positions, Locus assumes a direct off-road connection between the stops, following
+any added bends. The segment details identify this direct connection. Automatic
+speed uses the off-road walking estimate; manual speed is preserved. This does
+not check terrain or barriers. A single off-path stop still needs repositioning,
+and running retains the endpoint limit. Routing failures still report an error;
+use Walk → Free off-road for an explicit direct path without a mapped-route lookup.
 Other mapped modes retain a forty-meter endpoint limit. Tiny pin-to-path
 connectors are shown with light dashed lines and played at walking speed.
 This follows the router's mapped network; it does not independently survey water,

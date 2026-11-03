@@ -183,13 +183,25 @@ class Services:
                 if profile["costing"]:
                     mode = {"auto": "Drive", "pedestrian": "Walk", "bicycle": "Cycle"}[profile["costing"]]
                     choices = await self.route(waypoints, mode, url, profile["options"])
+                    # Both walking pins snapped away from their requested positions:
+                    # treat this as an intentional off-road connection, preserving bends.
+                    direct_walk = spec["profile"].startswith("walk_") and all(
+                        distance(choice["points"][0], start) > 2
+                        and distance(choice["points"][-1], end) > 2
+                        for choice in choices
+                    )
+                    if direct_walk:
+                        choices = [{"points": Route(waypoints).points,
+                                    "speed_warning": "Direct off-road walking connection between off-path stops."}]
                 else:
+                    direct_walk = False
                     choices = [{"points": Route(waypoints).points}]
                 options = []
                 rejected = []
                 for choice in choices:
                     option = copy.deepcopy(choice)
-                    await self.speed_metadata(option, spec, url, overpass_url, include_stops)
+                    speed_spec = {**spec, "profile": "offroad_walk"} if direct_walk else spec
+                    await self.speed_metadata(option, speed_spec, url, overpass_url, include_stops)
                     try:
                         self.anchor(option, start, end, max_gap=2 if profile["costing"] == "pedestrian" else 40)
                     except ValueError as error:
