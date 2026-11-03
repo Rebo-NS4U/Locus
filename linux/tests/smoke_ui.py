@@ -36,6 +36,7 @@ stage = 0
 started = time.monotonic()
 marked = started
 failure = None
+collapsed_width = None
 errors = []
 window.worker.failed.connect(lambda operation, error: errors.append((operation, error)))
 
@@ -49,7 +50,7 @@ window.map.loadFinished.connect(map_loaded)
 
 
 def check():
-    global stage, failure, marked
+    global stage, failure, marked, collapsed_width
     try:
         if time.monotonic() - started > 55:
             raise AssertionError(f"UI timeout at stage {stage}: {window.status.text()}")
@@ -57,11 +58,17 @@ def check():
         if stage == 0 and loaded and not window.busy:
             assert window.devices.currentData() == 'demo'
             assert window.colors['accent'].startswith('#')
+            assert not window.sidebar_scroll.isVisible()
+            assert window.map.width() >= window.width() * .95
+            assert window.map.height() >= window.height() * .85
+            collapsed_width = window.map.width()
+            window.sidebar_toggle.setChecked(True)
             window.worker.services.requester = fake_request
             window.draw_stops.setChecked(True)
             window.map.page().runJavaScript("map.fire('click', {latlng: L.latLng(51.5, -0.12)})")
             stage = 1
         elif stage == 1 and len(window.stops) == 1:
+            assert window.map.width() <= collapsed_width - 300
             window.map.page().runJavaScript("map.fire('click', {latlng: L.latLng(51.502, -0.122)})")
             stage = 2
         elif stage == 2 and len(window.stops) == 2:
@@ -108,18 +115,21 @@ def check():
         elif stage == 6 and not window.busy:
             assert window.store.data['recents']
             assert window.worker.session.journal.exists()
-            window.grab().save('/tmp/locus-linux-preview.png')
+            window.sidebar_toggle.setChecked(False)
             window.tabs.setCurrentIndex(1)
             window.start_route()
             stage = 7
             marked = time.monotonic()
         elif stage == 7 and not window.busy and time.monotonic() - marked > 1.3:
             assert window.worker.session.progress > 0
-            window.grab().save('/tmp/locus-linux-route.png')
+            assert window.map.width() >= window.width() * .95
+            window.grab().save('/tmp/locus-linux-map-space.png')
+            window.sidebar_toggle.setChecked(True)
             window.request('control', 'pause')
             stage = 8
         elif stage == 8 and not window.busy:
             assert window.worker.session.paused
+            window.grab().save('/tmp/locus-linux-route.png')
             window.request('control', 'resume')
             stage = 9
         elif stage == 9 and not window.busy:

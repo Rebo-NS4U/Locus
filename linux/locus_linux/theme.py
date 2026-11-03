@@ -45,15 +45,17 @@ def apply_theme(app, colors=None):
         QMainWindow, QDialog { background: %(bg)s; color: %(text)s; }
         QGroupBox { border: 1px solid %(border)s; border-radius: 12px; margin-top: 14px; padding: 16px 10px 10px; font-weight: 600; }
         QGroupBox::title { subcontrol-origin: margin; left: 14px; padding: 0 5px; color: %(accent)s; }
-        QPushButton { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 8px; padding: 9px 12px; }
+        QPushButton, QToolButton { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 7px; padding: 6px 9px; }
         QPushButton:hover { background: %(raised)s; border-color: %(accent)s; }
         QPushButton:pressed, QPushButton:checked { background: %(accent)s; color: %(on_accent)s; }
         QPushButton:disabled { color: %(muted)s; }
         QPushButton#primary { background: %(accent)s; color: %(on_accent)s; font-weight: 600; }
-        QLineEdit, QDoubleSpinBox, QComboBox, QListWidget { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 7px; padding: 7px; selection-background-color: %(accent)s; selection-color: %(on_accent)s; }
+        QLineEdit, QDoubleSpinBox, QComboBox, QListWidget { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 7px; padding: 5px; selection-background-color: %(accent)s; selection-color: %(on_accent)s; }
         QTabWidget::pane { border: 0; } QTabBar::tab { padding: 10px 13px; border-bottom: 2px solid transparent; }
         QTabBar::tab:selected { color: %(accent)s; border-bottom-color: %(accent)s; }
-        QLabel#subtitle { color: %(muted)s; } QLabel#status { background: %(surface)s; border-radius: 8px; padding: 12px; }
+        QLabel#subtitle { color: %(muted)s; } QLabel#status { background: %(surface)s; border-radius: 5px; padding: 3px 6px; font-size: 12px; }
+        QMenu { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; padding: 4px; }
+        QMenu::item { padding: 7px 18px; } QMenu::item:selected { background: %(raised)s; color: %(accent)s; }
         QToolTip { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; }
         QScrollArea { border: 0; } QSplitter::handle { background: %(bg)s; }
     """ % c)

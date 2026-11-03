@@ -8,6 +8,10 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 
 - Desktop colors and font from Qt6ct, with a warm brown/peach fallback. Palette
   changes are picked up while the app stays open. Matching night and street maps.
+- Map-first layout: one compact action bar, a slim status line and a collapsible
+  Controls sidebar (`Ctrl+B`), hidden by default. Coordinates, map display and the
+  legend live in Controls → Map; scanning, preparation and setup are in the `⋯`
+  device menu. Set location, Hold and Restore remain accessible with Controls hidden.
 - Explicit place search, map pins, coordinates, favorites, rename/delete and
   twenty recent applied locations. Selecting a place only previews it.
 - Eight-direction joystick and optional WASD/arrow-key controls. Releasing the
