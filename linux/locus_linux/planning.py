@@ -145,11 +145,12 @@ class RoutePlan:
             options = self.results.get(self.key(i), [])
             choice = options[self.selected.get(self.key(i), 0)] if options else None
             points = choice["points"] if choice else [self.points[i], *spec["controls"], self.points[i + 1]]
-            result.append({"points": points, "controls": spec["controls"], "color": profile["color"], "label": profile["label"], "ready": bool(options), "connectors": choice.get("connectors", []) if choice else []})
+            stops = [{"point": points[stop['index']], "kind": stop['kind']} for stop in choice.get('stops', [])] if choice else []
+            result.append({"points": points, "controls": spec["controls"], "color": profile["color"], "label": profile["label"], "ready": bool(options), "connectors": choice.get("connectors", []) if choice else [], "stops": stops})
         return result
 
     def assemble(self):
-        points, speeds, sources, driving = [], [], [], []
+        points, speeds, sources, driving, motorized, stops = [], [], [], [], [], []
         for i in range(len(self.pins) - 1):
             key = self.key(i)
             if not self.results.get(key):
@@ -158,14 +159,17 @@ class RoutePlan:
             shape = [coordinates(*p) for p in option["points"]]
             if points and distance(points[-1], shape[0]) > .05:
                 raise ValueError("Segments do not join at the shared pin; replan the route")
+            offset = len(points) - 1 if points else 0
+            stops.extend({'index': stop['index'] + offset, 'kind': stop['kind']} for stop in option.get('stops', []))
             points.extend(shape if not points else shape[1:])
             speeds.extend(option["speeds"])
             sources.extend(option["sources"])
             driving.extend(option["driving"])
+            motorized.extend(option.get('motorized', option['driving']))
             if len(points) > MAX_POINTS:
                 raise ValueError("Combined route exceeds the point limit")
-        Route(points, speeds=speeds, sources=sources, driving=driving)
-        return {"points": points, "speeds": speeds, "sources": sources, "driving": driving}
+        Route(points, speeds=speeds, sources=sources, driving=driving, motorized=motorized, stops=stops)
+        return {"points": points, "speeds": speeds, "sources": sources, "driving": driving, "motorized": motorized, "stops": stops}
 
     def serialize(self):
         return {"format": "locus-route", "version": 1, "pins": copy.deepcopy(self.pins), "legs": [self.spec(i) for i in range(len(self.pins) - 1)]}

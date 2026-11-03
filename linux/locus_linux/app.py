@@ -21,7 +21,7 @@ from .engine import Session, DemoTransport
 from .device import IPhoneTransport
 from .routes import SPEEDS, Route, parse_gpx, export_gpx
 from .storage import Places
-from .services import Services, PHOTON, VALHALLA, endpoint
+from .services import Services, PHOTON, VALHALLA, OVERPASS, endpoint
 from .theme import apply_theme, read_colors
 from .planning import RoutePlan, PROFILES
 
@@ -67,7 +67,7 @@ class Worker(QThread):
                         if self.session.journal.exists():
                             raise ValueError("Restore the current session before changing device setup or transport.")
                         result = await getattr(self.transport, operation)(*args)
-                    elif operation in ("apply", "restore", "configure", "start_route", "control", "joystick"):
+                    elif operation in ("apply", "restore", "configure", "configure_traffic", "start_route", "control", "joystick"):
                         result = await getattr(self.session, operation)(*args)
                     elif operation in ("search", "mixed_route"):
                         result = await getattr(self.services, operation)(*args)
@@ -470,6 +470,20 @@ class Window(QMainWindow):
         self.variation = QCheckBox("Natural speed variation (±10%)")
         self.variation.toggled.connect(self.configure_motion)
         group.addWidget(self.variation)
+        group = self.group("Driving stops", box)
+        self.traffic_stops = QCheckBox("Auto stops at mapped signs and lights")
+        self.traffic_stops.setChecked(self.store.data['settings'].get('traffic_stops', True))
+        self.traffic_stops.setToolTip('Stop signs pause for 2–5 seconds. Simulated red lights wait 8–65 seconds. Replan to fetch traffic controls; signal phases are not live.')
+        self.traffic_stops.toggled.connect(self.configure_motion)
+        group.addWidget(self.traffic_stops)
+        self.red_probability = QDoubleSpinBox()
+        self.red_probability.setRange(0, 100)
+        self.red_probability.setDecimals(0)
+        self.red_probability.setSingleStep(5)
+        self.red_probability.setSuffix('% of lights red')
+        self.red_probability.setValue(self.store.data['settings'].get('red_probability', 45))
+        self.red_probability.valueChanged.connect(self.configure_motion)
+        group.addWidget(self.red_probability)
         group = self.group("Joystick", box)
         directions = QGridLayout()
         for label, x, y, row, col in [("↖", -1, 1, 0, 0), ("↑", 0, 1, 0, 1), ("↗", 1, 1, 0, 2),
@@ -513,8 +527,11 @@ class Window(QMainWindow):
         group.addWidget(QLabel("Valhalla route endpoint"))
         self.valhalla = QLineEdit(self.store.data["settings"].get("valhalla", VALHALLA))
         group.addWidget(self.valhalla)
+        group.addWidget(QLabel('Overpass endpoint (larger segments)'))
+        self.overpass = QLineEdit(self.store.data['settings'].get('overpass', OVERPASS))
+        group.addWidget(self.overpass)
         self.button("Save settings", self.save_settings, group)
-        for text in ["Search sends submitted text to Photon. Route planning and automatic speed lookup send stops and route geometry to Valhalla. Map views fetch OpenStreetMap tiles. Phone identifiers, favorites and session state stay on this computer.",
+        for text in ["Search sends text to Photon. Route/speed lookup sends paths to Valhalla. Stop lookup sends road/node IDs to OpenStreetMap for small segments, or to Overpass for larger ones. Map views fetch OpenStreetMap tiles. Phone identifiers stay local.",
                      "Appearance follows your Qt desktop colors and font. iOS 17.4+ and Developer Mode are required."]:
             label = QLabel(text)
             label.setWordWrap(True)
@@ -585,7 +602,7 @@ class Window(QMainWindow):
         self.request(operation, *args)
 
     def completed(self, operation, result):
-        if operation in ("configure", "joystick"):
+        if operation in ("configure", "configure_traffic", "joystick"):
             return
         self.busy = False
         self.pending_operation = None
@@ -628,7 +645,7 @@ class Window(QMainWindow):
             self.close()
 
     def failure(self, operation, message):
-        if operation not in ("configure", "joystick"):
+        if operation not in ("configure", "configure_traffic", "joystick"):
             self.busy = False
             self.pending_operation = None
             self.exit_after_restore = False
@@ -650,10 +667,16 @@ class Window(QMainWindow):
         self.connection_badge.setStyleSheet(f"color: {self.colors['accent'] if state['connected'] else self.colors['muted']};")
         self.js("setAcknowledged", state["position"], state["connected"])
         self.progress.setText(f"{'Paused / holding' if state['paused'] else 'Following route'} · {state['progress'] / 1000:.2f} / {state['total'] / 1000:.2f} km · {state.get('speed_kph', 0):.1f} km/h\n{state.get('speed_source', '')}" if state["total"] else "Not following a route")
+        if state.get('traffic_stop'):
+            stop = state['traffic_stop']
+            label = 'Stop sign' if stop['kind'] == 'stop_sign' else 'Simulated red light'
+            self.connection_badge.setText(f"{label} · {stop['remaining']:.0f}s")
+            self.progress.setText(self.progress.text() + f"\n{label}: {stop['remaining']:.1f}s remaining")
 
     def configure_motion(self, *unused):
         if self.ready:
             self.worker.submit("configure", self.speed.value() / 3.6, self.variation.isChecked(), self.reconnect.isChecked())
+            self.worker.submit('configure_traffic', self.traffic_stops.isChecked(), self.red_probability.value() / 100)
 
     def preset_speed(self, mode):
         if hasattr(self, "speed"):
@@ -881,6 +904,11 @@ class Window(QMainWindow):
                 low, high = min(option["speeds"]) * 3.6, max(option["speeds"]) * 3.6
                 text += f"targets {low:.1f}–{high:.1f} km/h\n"
                 text += option.get("speed_warning", option["sources"][0])
+                signs = sum(stop['kind'] == 'stop_sign' for stop in option.get('stops', []))
+                lights = sum(stop['kind'] == 'traffic_light' for stop in option.get('stops', []))
+                text += f'\n{signs} stop signs · {lights} traffic lights'
+                if option.get('traffic_warning'):
+                    text += '\n' + option['traffic_warning']
             else:
                 text += "Needs planning. Auto driving uses road data; free off-road uses an estimated speed."
             self.segment_info.setText(text)
@@ -991,7 +1019,7 @@ class Window(QMainWindow):
         if not self.busy and self.editable_route():
             self.planning_revision = self.route_plan.revision
             self.planning_document = self.route_plan
-            self.request("mixed_route", self.route_plan.requests(), self.store.data["settings"].get("valhalla", VALHALLA))
+            self.request("mixed_route", self.route_plan.requests(), self.store.data["settings"].get("valhalla", VALHALLA), self.store.data['settings'].get('overpass', OVERPASS), self.traffic_stops.isChecked())
 
     def choose_route(self, index):
         if 0 <= index < len(self.alternatives) and self.editable_route():
@@ -1070,7 +1098,8 @@ class Window(QMainWindow):
         try:
             self.store.data["settings"].update(photon=endpoint(self.photon.text().strip()), valhalla=endpoint(self.valhalla.text().strip()),
                 reconnect=self.reconnect.isChecked(), notifications=self.notifications.isChecked(), travel_mode=self.travel_mode.currentText(),
-                speed_kph=self.speed.value(), variation=self.variation.isChecked(), night_map=self.map_style.currentIndex() == 0, follow=self.follow.isChecked())
+                speed_kph=self.speed.value(), variation=self.variation.isChecked(), night_map=self.map_style.currentIndex() == 0, follow=self.follow.isChecked(),
+                traffic_stops=self.traffic_stops.isChecked(), red_probability=self.red_probability.value(), overpass=endpoint(self.overpass.text().strip()))
             self.store.save()
             self.configure_motion()
             self.status.setText("Settings saved.")

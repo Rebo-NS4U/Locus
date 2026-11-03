@@ -1,4 +1,4 @@
-# Locus for Linux 0.3
+# Locus for Linux 0.4
 
 A native PySide6/Qt desktop companion to the original Locus iPhone application.
 It controls a connected iPhone; it does not change the Linux computer's location.
@@ -27,6 +27,11 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   with acceleration and braking toward turns/lower limits. Missing data is labeled
   as an estimate. Manual speed overrides are available per segment. This estimates
   simulated movement; it does not sense the phone's actual vehicle speed or live traffic.
+- Auto stops at mapped stop signs and lights, enabled by default. Signs get varied
+  2–5 second pauses; each light has a configurable chance of simulated red (45%
+  default), with 8–65 second waits. Driving brakes before the control and restarts
+  smoothly while fixed-location refresh continues through the wait. Signal phases
+  and durations are simulated, not live traffic data.
 - Colored, clickable segments and draggable bend handles; right-click a bend to
   remove it. Editable `.locus.json` route projects retain pins, profiles, bends and
   speed settings. See the [mixed-routing guide](docs/routing.md).
@@ -135,7 +140,9 @@ with unresolved state.
 The map is local bundled Leaflet inside Qt WebEngine. There is no HTTP control
 server. Map views request OpenStreetMap tiles; submitted searches go to Photon;
 route planning sends selected stops/bends to Valhalla, and driving speed lookup
-sends planned route geometry to its trace-attributes endpoint. The services see
+sends planned route geometry to its trace-attributes endpoint. Driving-stop lookup
+sends road/node IDs to the OpenStreetMap read API for small segments, or to the
+configured Overpass server for larger/custom lookups. The services see
 your IP address and submitted text/area/paths, not device IDs. Playback itself
 sends no routing requests. No autocomplete, bulk tile downloading or offline caching is
 implemented. The night map styles the same tiles locally.

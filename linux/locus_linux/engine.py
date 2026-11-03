@@ -18,7 +18,7 @@ def coordinates(latitude, longitude):
 
 
 class Session:
-    def __init__(self, transport, journal: Path, notify=lambda message: None, changed=lambda state: None):
+    def __init__(self, transport, journal: Path, notify=lambda message: None, changed=lambda state: None, traffic_rng=None):
         self.transport, self.journal, self.notify = transport, journal, notify
         self.lock = asyncio.Lock()
         self.device = None
@@ -39,13 +39,34 @@ class Session:
         self.next_retry = 0
         self.last_tick = time.monotonic()
         self.motion_speed = 0.0
+        self.traffic_enabled = True
+        self.red_probability = .45
+        self.traffic_rng = traffic_rng or random.Random()
+        self.traffic = None
 
     def snapshot(self):
         return {"mode": self.mode, "paused": self.paused, "position": self.last_ack,
                 "connected": self.target is not None, "progress": self.progress,
                 "total": self.route.total if self.route and self.mode == "route" else 0,
                 "speed_kph": self.motion_speed * 3.6,
-                "speed_source": self.route.sources[self.route.edge_at(self.progress)] if self.route and self.route.sources and self.mode == "route" else "manual / global"}
+                "speed_source": self.route.sources[self.route.edge_at(self.progress)] if self.route and self.route.sources and self.mode == "route" else "manual / global",
+                "traffic_stop": {"kind": self.traffic.waiting['kind'], "remaining": self.traffic.remaining} if self.mode == 'route' and self.traffic and self.traffic.waiting else None}
+
+    async def configure_traffic(self, enabled, red_probability=.45):
+        from .traffic import TrafficSchedule
+        if not isinstance(enabled, bool) or not math.isfinite(red_probability) or not 0 <= red_probability <= 1:
+            raise ValueError('Traffic stops need an on/off choice and red-light probability 0–100%.')
+        async with self.lock:
+            if enabled == self.traffic_enabled and red_probability == self.red_probability:
+                return 'Driving stop settings unchanged.'
+            previous = self.traffic
+            self.traffic_enabled, self.red_probability = enabled, red_probability
+            if self.route and self.mode == 'route':
+                self.traffic = TrafficSchedule(self.route.stops, enabled, red_probability, self.traffic_rng, after=self.progress + .01)
+                if enabled and previous and previous.waiting:
+                    self.traffic.waiting, self.traffic.remaining = previous.waiting, previous.remaining
+            self.changed(self.snapshot())
+        return 'Driving stop settings updated.'
 
     async def configure(self, speed, variation, reconnect):
         if not math.isfinite(speed) or not 0.1 <= speed <= 100:
@@ -62,6 +83,8 @@ class Session:
             self.route, self.progress, self.loop_route = route, 0, bool(loop)
             self.mode, self.paused = "route", False
             self.motion_speed = 0 if not route.speeds or (route.driving and route.driving[0]) else route.speeds[0]
+            from .traffic import TrafficSchedule
+            self.traffic = TrafficSchedule(route.stops, self.traffic_enabled, self.red_probability, self.traffic_rng)
             self.last_tick = time.monotonic()
             self.changed(self.snapshot())
         return "Following route. Pause holds the current location."
@@ -134,6 +157,7 @@ class Session:
             self.last_target = target
             self.mode, self.vector = "fixed", (0, 0)
             self.motion_speed = 0
+            self.traffic = None
             try:
                 await self.transport.set(device, *target)
             except BaseException:
@@ -175,13 +199,22 @@ class Session:
                 elif self.mode == "route" and not self.paused:
                     if self.progress >= self.route.total and self.loop_route:
                         self.progress = 0
+                        from .traffic import TrafficSchedule
+                        self.traffic = TrafficSchedule(self.route.stops, self.traffic_enabled, self.red_probability, self.traffic_rng)
                     previous = self.progress
-                    if self.route.speeds:
-                        duration = max(0, min(elapsed, 2))
+                    duration = max(0, min(elapsed, 2))
+                    waiting = self.traffic and self.traffic.waiting
+                    upcoming = self.traffic.upcoming if self.traffic else None
+                    if waiting:
+                        self.traffic.hold(duration)
+                        self.motion_speed = 0
+                    elif self.route.speeds:
                         edge = self.route.edge_at(self.progress)
-                        automatic = self.route.driving and self.route.driving[edge]
+                        automatic = (self.route.driving and self.route.driving[edge]) or (self.traffic_enabled and self.route.stops and self.route.motorized[edge])
                         factor = random.uniform(.9, 1 if automatic else 1.1) if self.variation else 1
                         desired = self.route.desired_speed(self.progress) * factor
+                        if upcoming:
+                            desired = min(desired, math.sqrt(2 * 3 * max(0, upcoming['distance'] - self.progress)))
                         if automatic:
                             cap = min(desired, self.motion_speed + 2 * duration) if desired >= self.motion_speed else max(desired, self.motion_speed - 3 * duration)
                         else:
@@ -191,6 +224,10 @@ class Session:
                     else:
                         self.progress = min(self.route.total, self.progress + meters)
                         self.motion_speed = speed
+                    if not waiting and upcoming and self.progress >= upcoming['distance'] - 1e-7:
+                        self.progress = upcoming['distance']
+                        self.traffic.arrive()
+                        self.motion_speed = 0
                     candidate = self.route.at(self.progress)
                     if self.progress >= self.route.total and not self.loop_route:
                         self.paused = True
@@ -225,6 +262,7 @@ class Session:
             self.target = None
             self.paused, self.vector = True, (0, 0)
             self.motion_speed = 0
+            self.traffic = None
             if self.refresh:
                 self.refresh.cancel()
             # Never remove the recovery record if clear/teardown fails.

@@ -10,6 +10,8 @@ from .routes import Route, MAX_POINTS, distance
 
 PHOTON = "https://photon.komoot.io/api/"
 VALHALLA = "https://valhalla1.openstreetmap.de/route"
+OVERPASS = "https://overpass.private.coffee/api/interpreter"
+OSM_READ = 'https://api.openstreetmap.org/api/0.6'
 
 
 def endpoint(value):
@@ -49,7 +51,9 @@ def decode_shape(shape):
 
 def request_json(url, params):
     import requests
-    options = {"headers": {"User-Agent": "LocusLinux/0.3 (https://github.com/Rebo-NS4U/Locus)"}, "timeout": (5, 15), "stream": True}
+    options = {"headers": {"User-Agent": "LocusLinux/0.4 (https://github.com/Rebo-NS4U/Locus)", "Accept": "application/json"}, "timeout": (5, 15), "stream": True}
+    if 'data' in params:
+        options['timeout'] = (5, 35)  # Allow the public Overpass queue plus its bounded query time.
     response = requests.post(url, json=params["_json_body"], **options) if "_json_body" in params else requests.get(url, params=params, **options)
     with response:
         response.raise_for_status()
@@ -82,6 +86,7 @@ class Services:
         self.cache = {}
         self.lock = asyncio.Lock()
         self.last_request = 0
+        self.map_objects = {}
 
     async def get(self, url, params):
         endpoint(url)
@@ -137,7 +142,7 @@ class Services:
             raise ValueError(response.get("error", "No connected road route found. Try closer stops."))
         return results
 
-    async def mixed_route(self, legs, url=VALHALLA):
+    async def mixed_route(self, legs, url=VALHALLA, overpass_url=OVERPASS, include_stops=True):
         from .planning import specification, PROFILES
         if not 1 <= len(legs) <= 11:
             raise ValueError("A mixed route needs 2–12 main pins")
@@ -161,7 +166,7 @@ class Services:
                 rejected = []
                 for choice in choices:
                     option = copy.deepcopy(choice)
-                    await self.speed_metadata(option, spec, url)
+                    await self.speed_metadata(option, spec, url, overpass_url, include_stops)
                     try:
                         self.anchor(option, start, end)
                     except ValueError as error:
@@ -177,7 +182,7 @@ class Services:
                 raise ValueError(f"Segment {number}: {error}") from error
         return result
 
-    async def speed_metadata(self, option, spec, url):
+    async def speed_metadata(self, option, spec, url, overpass_url=OVERPASS, include_stops=True):
         from .planning import PROFILES
         profile = PROFILES[spec["profile"]]
         auto = spec["speed_mode"] == "auto"
@@ -185,11 +190,12 @@ class Services:
         speed = profile["speed"] if auto else spec["speed_kph"]
         source = "manual" if not auto else ("off-road estimate" if not profile["costing"] else "profile estimate")
         count = len(option["points"]) - 1
-        option.update(speeds=[speed / 3.6] * count, sources=[source] * count, driving=[driving] * count)
-        if not (auto and profile["costing"] == "auto"):
+        vehicle = spec['profile'].startswith(('car_', 'offroad_car'))
+        option.update(speeds=[speed / 3.6] * count, sources=[source] * count, driving=[driving] * count, motorized=[vehicle] * count, stops=[])
+        if not (profile["costing"] == "auto" and (auto or include_stops)):
             return
         payload = {"encoded_polyline": encode_shape(option["points"]), "shape_match": "edge_walk", "costing": "auto", "units": "kilometers",
-                   "filters": {"action": "include", "attributes": ["shape", "edge.begin_shape_index", "edge.end_shape_index", "edge.speed", "edge.speed_limit", "edge.road_class", "edge.surface", "edge.use"]}}
+                   "filters": {"action": "include", "attributes": ["shape", "edge.begin_shape_index", "edge.end_shape_index", "edge.speed", "edge.speed_limit", "edge.road_class", "edge.surface", "edge.use", "edge.way_id", "edge.forward", "edge.traffic_signal", "node.traffic_signal"]}}
         try:
             trace = await self.get(url.rsplit("/", 1)[0] + "/trace_attributes", {"_json_body": payload})
             points = decode_shape(trace["shape"])
@@ -197,7 +203,7 @@ class Services:
             if distance(points[0], option["points"][0]) > 2 or distance(points[-1], option["points"][-1]) > 2:
                 raise ValueError("Speed metadata did not match the planned geometry")
             speeds = [speed / 3.6] * (len(points) - 1)
-            sources = ["road estimate"] * len(speeds)
+            sources = ["road estimate" if auto else 'manual'] * len(speeds)
             for edge in trace.get("edges", []):
                 first, last = int(edge["begin_shape_index"]), int(edge["end_shape_index"])
                 if not 0 <= first <= last < len(points):
@@ -219,17 +225,71 @@ class Services:
                 if spec["profile"] == "car_tracks":
                     value = min(value, 25)
                 for index in range(first, last):
-                    speeds[index] = max(.1, min(100, value / 3.6))
-                    sources[index] = label
+                    speeds[index] = max(.1, min(100, value / 3.6)) if auto else speed / 3.6
+                    sources[index] = label if auto else 'manual'
             if not trace.get("edges"):
                 raise ValueError("Road speed metadata unavailable")
-            option.update(points=points, speeds=speeds, sources=sources, driving=[True] * len(speeds))
+            option.update(points=points, speeds=speeds, sources=sources, driving=[auto] * len(speeds), motorized=[True] * len(speeds))
+            if include_stops:
+                await self.traffic_metadata(option, trace, overpass_url)
         except Exception:
             # Explicit estimate, never a claim that a posted speed was detected.
-            option["speed_warning"] = f"Road speed data unavailable; using a {speed:g} km/h estimate."
+            if auto:
+                option["speed_warning"] = f"Road speed data unavailable; using a {speed:g} km/h estimate."
+            if include_stops:
+                option['traffic_warning'] = 'Mapped traffic control data unavailable for this segment.'
+
+    async def traffic_metadata(self, option, trace, url):
+        from .traffic import attach_controls
+        elements = []
+        try:
+            ways = sorted({int(edge['way_id']) for edge in trace.get('edges', []) if int(edge.get('way_id', 0)) > 0})
+            if not ways or len(ways) > 600:
+                raise ValueError('Way metadata unavailable or segment too large')
+            if url == OVERPASS and len(ways) <= 20:
+                # Bounded, cached reads of only the roads/nodes in this small
+                # human-requested segment; larger requests use Overpass.
+                elements = await self.small_road_objects(ways)
+            else:
+                for start in range(0, len(ways), 60):
+                    ids = ','.join(map(str, ways[start:start + 60]))
+                    query = f'[out:json][timeout:12];way(id:{ids})->.roads;(.roads;node(w.roads)[highway=stop];node(w.roads)[highway=traffic_signals];);out body;'
+                    response = await self.get(url, {'data': query})
+                    if response.get('remark') or not isinstance(response.get('elements'), list):
+                        raise ValueError('Incomplete traffic control response')
+                    elements.extend(response['elements'])
+        except Exception:
+            option['traffic_warning'] = 'Stop-sign lookup unavailable; only available route-provider traffic lights can be used.'
+        try:
+            attach_controls(option, trace, elements)
+        except Exception:
+            option['traffic_warning'] = 'Traffic controls could not be aligned with this segment.'
+
+    async def small_road_objects(self, ways):
+        async def objects(kind, ids):
+            now = time.monotonic()
+            values = {identifier: self.map_objects[kind, identifier][1] for identifier in ids if (kind, identifier) in self.map_objects and now - self.map_objects[kind, identifier][0] < 300}
+            missing = [identifier for identifier in ids if identifier not in values]
+            for offset in range(0, len(missing), 300):
+                response = await self.get(f'{OSM_READ}/{kind}s.json', {kind + 's': ','.join(map(str, missing[offset:offset + 300]))})
+                for item in response.get('elements', []):
+                    if item.get('type') == kind:
+                        if len(self.map_objects) >= 5000:
+                            self.map_objects.pop(next(iter(self.map_objects)))
+                        # Discard contributor/user metadata; only routing data is needed.
+                        public = {key: item[key] for key in ('type', 'id', 'nodes', 'lat', 'lon', 'tags') if key in item}
+                        self.map_objects[kind, int(item['id'])] = time.monotonic(), public
+                        values[int(item['id'])] = public
+            return [values[identifier] for identifier in ids]
+        roads = await objects('way', ways)
+        nodes = sorted({int(node) for road in roads for node in road.get('nodes', [])})
+        if not nodes or len(nodes) > 1200:
+            raise ValueError('Segment too large for bounded OSM read lookup')
+        return roads + await objects('node', nodes)
 
     @staticmethod
     def anchor(option, start, end):
+        option.setdefault('motorized', list(option.get('driving', [False] * (len(option['points']) - 1))))
         option["connectors"] = []
         for point, anchor in ((option["points"][0], start), (option["points"][-1], end)):
             if distance(point, anchor) > 40:
@@ -240,17 +300,21 @@ class Services:
                 option["points"][index] = anchor
                 continue
             if first:
+                for stop in option.get('stops', []):
+                    stop['index'] += 1
                 option["connectors"].append([anchor, option["points"][0]])
                 option["points"].insert(0, anchor)
                 option["speeds"].insert(0, 1.4)
                 option["sources"].insert(0, "short pin connector")
                 option["driving"].insert(0, False)
+                option['motorized'].insert(0, False)
             else:
                 option["connectors"].append([option["points"][-1], anchor])
                 option["points"].append(anchor)
                 option["speeds"].append(1.4)
                 option["sources"].append("short pin connector")
                 option["driving"].append(False)
+                option['motorized'].append(False)
 
 
 def math_is_positive(value):

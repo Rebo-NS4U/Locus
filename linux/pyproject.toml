@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "locus-linux"
-version = "0.3.0"
-description = "Native Linux Locus with editable mixed-terrain routes and automatic driving speed"
+version = "0.4.0"
+description = "Native Linux Locus with mixed routing, automatic driving speed and mapped traffic stops"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "GPL-3.0-or-later"

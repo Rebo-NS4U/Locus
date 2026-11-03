@@ -2,6 +2,7 @@
 import os
 import tempfile
 import time
+import asyncio
 from pathlib import Path
 from unittest.mock import patch
 
@@ -27,7 +28,7 @@ def fake_request(url, params):
     if url.endswith('trace_attributes'):
         shape = params['_json_body']['encoded_polyline']
         traced = decode_shape(shape)
-        return {'shape': shape, 'edges': [{'begin_shape_index': 0, 'end_shape_index': len(traced) - 1, 'speed': 50, 'speed_limit': 30, 'surface': 'paved_smooth'}]}
+        return {'shape': shape, 'edges': [{'begin_shape_index': 0, 'end_shape_index': len(traced) - 1, 'speed': 50, 'speed_limit': 30, 'surface': 'paved_smooth', 'end_node': {'traffic_signal': True}}]}
     if 'q' in params:
         return {'features': [{'geometry': {'coordinates': [-.12, 51.5]}, 'properties': {'name': 'Westminster', 'city': 'London'}}]}
     import json
@@ -50,6 +51,7 @@ marked = started
 failure = None
 collapsed_width = None
 errors = []
+traffic_future = None
 window.worker.failed.connect(lambda operation, error: errors.append((operation, error)))
 
 
@@ -62,14 +64,16 @@ window.map.loadFinished.connect(map_loaded)
 
 
 def check():
-    global stage, failure, marked, collapsed_width
+    global stage, failure, marked, collapsed_width, traffic_future
     try:
-        if time.monotonic() - started > 55:
+        if time.monotonic() - started > 65:
             raise AssertionError(f"UI timeout at stage {stage}: {window.status.text()}")
         assert not errors, errors
         if stage == 0 and loaded and not window.busy:
             assert window.devices.currentData() == 'demo'
             assert window.colors['accent'].startswith('#')
+            assert window.traffic_stops.isChecked()
+            window.red_probability.setValue(100)
             assert not window.sidebar_scroll.isVisible()
             assert window.map.width() >= window.width() * .95
             assert window.map.height() >= window.height() * .85
@@ -179,6 +183,20 @@ def check():
             assert window.map.width() >= window.width() * .95
             window.grab().save('/tmp/locus-linux-map-space.png')
             window.sidebar_toggle.setChecked(True)
+            async def reach_control():
+                for _ in range(100):
+                    await window.worker.session.tick(1)
+                    if window.worker.session.snapshot().get('traffic_stop'):
+                        return window.worker.session.snapshot()
+                raise AssertionError('Traffic light was not reached')
+            traffic_future = asyncio.run_coroutine_threadsafe(reach_control(), window.worker.loop)
+            stage = 70
+        elif stage == 70 and traffic_future.done() and 'red light' in window.connection_badge.text().lower():
+            result = traffic_future.result()
+            assert result['traffic_stop']['kind'] == 'traffic_light'
+            assert result['speed_kph'] == 0
+            assert 'red light' in window.connection_badge.text().lower()
+            window.grab().save('/tmp/locus-linux-traffic-stop.png')
             window.request('control', 'pause')
             stage = 8
         elif stage == 8 and not window.busy:

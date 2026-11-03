@@ -3,7 +3,8 @@
 **Linux desktop port:** This fork includes a native Qt application in
 [`linux/`](linux/README.md), with desktop theme integration, place search,
 favorites/recents, joystick and keyboard movement, road routes, GPX, adjustable
-speed, editable mixed-terrain segments, automatic road-aware driving speeds,
+speed, editable mixed-terrain segments, automatic road-aware driving speeds and
+randomized waits at mapped stop signs/traffic lights,
 pause/resume/loop, USB/Wi-Fi transport, recovery and a hardware-free demo.
 USB command-level tests passed on iOS 26.6.2; see the Linux guide for tested scope
 and remaining phone-app readback, unplug recovery and Wi-Fi validation.

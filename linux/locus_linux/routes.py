@@ -44,7 +44,7 @@ def interpolate(a, b, fraction):
 
 
 class Route:
-    def __init__(self, points, speeds=None, sources=None, driving=None):
+    def __init__(self, points, speeds=None, sources=None, driving=None, motorized=None, stops=None):
         if not 2 <= len(points) <= MAX_POINTS:
             raise ValueError(f"A route needs 2–{MAX_POINTS} points.")
         self.points = [coordinates(*p) for p in points]
@@ -59,11 +59,19 @@ class Route:
         self.speeds = list(speeds) if speeds is not None else None
         self.sources = list(sources) if sources is not None else None
         self.driving = list(driving) if driving is not None else None
-        for values in (self.speeds, self.sources, self.driving):
+        self.motorized = list(motorized) if motorized is not None else list(self.driving or [False] * (len(self.points) - 1))
+        for values in (self.speeds, self.sources, self.driving, self.motorized):
             if values is not None and len(values) != len(self.points) - 1:
                 raise ValueError("Speed metadata must match every route edge")
         if self.speeds is not None and any(not isinstance(s, (int, float)) or not math.isfinite(s) or not .1 <= s <= 100 for s in self.speeds):
             raise ValueError("Route speeds must be 0.1–100 m/s")
+        self.stops = []
+        for entry in stops or []:
+            index, kind = entry.get('index'), entry.get('kind')
+            if type(index) is not int or not 0 <= index < len(self.points) or kind not in ('stop_sign', 'traffic_light'):
+                raise ValueError('Invalid mapped traffic control')
+            if self.lengths[index] < self.total - .1 and (self.motorized[min(index, len(self.motorized) - 1)] or self.motorized[max(0, index - 1)]):
+                self.stops.append({'distance': self.lengths[index], 'kind': kind})
 
     def edge_at(self, meters):
         return min(len(self.points) - 2, max(0, bisect.bisect_right(self.lengths, meters) - 1))

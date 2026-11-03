@@ -43,6 +43,12 @@ window.setRoute = (points, stops, segments = [], selected = -1) => {
     line.bindTooltip(`${index + 1} → ${index + 2} · ${segment.label}${segment.ready ? '' : ' · needs planning'}`);
     if (segments.length) line.on('click', () => { if (bridge) bridge.selectLeg(index); });
     (segment.connectors || []).forEach(connector => L.polyline(connector, {segmentColor: '#efdfd6', color: '#efdfd6', weight: 4, dashArray: '3,5'}).bindTooltip('Short connector from pin to mapped path').addTo(routeLine));
+    (segment.stops || []).forEach(stop => {
+      const light = stop.kind === 'traffic_light';
+      const color = light ? '#ffb595' : '#dec56e';
+      L.circleMarker(stop.point, {radius: 5, weight: 2, color, segmentColor: color, fillColor: palette.bg, fillOpacity: 1})
+        .bindTooltip(light ? 'Mapped traffic light · simulated red/green' : 'Mapped stop sign').addTo(routeLine);
+    });
     if (index === selected) (segment.controls || []).forEach((point, bend) => {
       const handle = L.marker(point, {draggable: true, icon: L.divIcon({className: 'route-bend', html: '', iconSize: [14,14], iconAnchor: [7,7]})}).addTo(map);
       handle.bindTooltip('Drag to reshape · right-click to remove bend');

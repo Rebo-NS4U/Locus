@@ -78,6 +78,50 @@ Planned mixed routes use their own per-segment speeds. Pause holds the current
 point. Stop/hold before editing an active route, then plan and start the revised
 route explicitly. Reconnection never automatically resumes a paused route.
 
+## Automatic stop signs and traffic lights
+
+**Controls → Move → Driving stops** is on by default for newly planned mapped car
+segments, including manual-speed driving. Stop signs always receive a sampled
+2–5 second wait, weighted toward about three seconds. Each traffic light is
+independently sampled as red or green once per route lap; the default chance of
+red is 45%, adjustable from 0–100%. A red light receives an 8–65 second wait,
+weighted toward 25 seconds. These triangular distributions are simulation
+heuristics, not measurements or predictions of local signal timing.
+
+The controller slows on approach, clamps progress at the control, continues
+sending the same coordinates throughout the wait, then accelerates again. The
+sidebar and compact status badge show the reason and remaining time. The update
+cadence is about one second, so observed waits are rounded up to the next update.
+Pause, sleep and connection loss freeze the countdown. Resume continues the
+remaining wait; changing speed settings does not randomly restart it. A new lap
+samples new light decisions and durations. Restore cancels stop state entirely.
+
+Walking, cycling and free off-road segments do not acquire driving controls.
+The feature does not invent stops at ordinary intersections. Replan an existing
+route to fetch control metadata. The moving-time estimates beside alternatives
+do not include the additional random waits.
+
+Light flags come from the routed Valhalla edges/nodes. For small segments, a
+bounded OpenStreetMap read fetches at most twenty ways and 1,200 referenced nodes,
+in batches of at most 300; larger segments use the configured Overpass endpoint.
+Requests and individual map objects are cached for five minutes and rate limited.
+No lookup occurs during playback. A custom Overpass endpoint is honored instead
+of the small-segment read path. These services receive public road/node IDs, which
+reveal the planned area, never the phone identifier.
+
+Stop-sign nodes must belong to the actual traversed way and project within
+twelve meters of it; forward/backward tags are respected when present. Explicit
+directional light nodes take precedence over nearby generic intersection-center
+flags on that road. Adjacent duplicate controls are grouped into one stop. Map
+data can be incomplete or out of date; missing sign data is displayed as a warning,
+while available routing-provider light flags can still be used. Overpass public
+instances were timing out during development; small-segment reads were verified
+live, with actual signs and signals found on a sample route.
+
+These are simulated phases and approximate mapped stop locations, not live
+traffic, real vehicle sensing, or a guarantee that every intersection is covered.
+The phone still receives coordinates only; its apps may infer speed differently.
+
 ## Save, load and export
 
 **Save route project** writes an editable `.locus.json` file containing pins,
@@ -95,3 +139,5 @@ Provider references:
 - [Valhalla routing preferences](https://valhalla.github.io/valhalla/api/route/api-reference/)
 - [Valhalla speed metadata](https://valhalla.github.io/valhalla/concepts/speeds/)
 - [Valhalla trace attributes](https://valhalla.github.io/valhalla/api/map-matching/api-reference/)
+- [OpenStreetMap stop-sign tagging](https://wiki.openstreetmap.org/wiki/Tag:highway%3Dstop)
+- [OpenStreetMap bounded multi-fetch API](https://wiki.openstreetmap.org/wiki/API_v0.6#Multi_fetch:_GET_/api/0.6/%5Bnodes%7Cways%7Crelations%5D?#parameters)

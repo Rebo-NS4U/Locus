@@ -50,6 +50,12 @@ automated motion tests, the native demo editor and live public routing/speed-dat
 requests. They have not been separately re-tested on the physical phone. The USB
 command tests above describe the earlier controller workflow.
 
+Version 0.4 driving stops were checked with automated placement/scheduling/motion
+tests and a native demo countdown. Live read-only routing and OpenStreetMap
+queries identified actual stop signs and signals on a public sample route. No
+new phone location commands were issued for these stop tests; phone-app readback
+of the new waits remains unverified.
+
 - Independent observation of the selected and cleared location inside a phone app.
 - Physical cable unplug/replug during an active session and clear after recovery.
 - Wi-Fi set/refresh/clear on a discoverable phone, and restoration after a Wi-Fi loss.
