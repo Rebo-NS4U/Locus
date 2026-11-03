@@ -31,12 +31,13 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 - First-run setup guide and an application-menu installer.
 - `--demo` exercises the same desktop interface with fake phone hardware.
 
-This is a development build. USB discovery, pairing/developer status, developer
-image preparation and opening/closing the rootless location-service connection
-have been checked on a physical iPhone running iOS 26.6.2. **Sending coordinates,
-movement, restoration and Wi-Fi hardware validation remain pending.** Automated
-device tests use controlled doubles; passing them does not prove full phone/OS
-compatibility. No game compatibility is claimed.
+This is a development build. USB discovery, preparation, fixed-location refresh,
+joystick, route pause/resume/loop and the clear/cleanup sequence have passed
+command-level tests on a physical iPhone running iOS 26.6.2. **The location shown
+inside phone apps has not been independently measured. Wi-Fi location testing
+remains pending because the phone did not advertise its wireless service.** See
+[the hardware test record](docs/hardware-validation.md) for scope and limits.
+Automated device tests use controlled doubles. No game compatibility is claimed.
 
 ## Install and run
 
@@ -156,10 +157,10 @@ network responses, exercises the real Qt controls and map bridge, and closes its
 window. It writes preview screenshots to `/tmp/locus-linux-*.png`.
 
 Live Photon search and Valhalla walking/cycling/driving requests have also been
-checked during development. On iOS 26.6.2, physical USB detection, trusted pairing,
-Developer Mode status, developer image preparation and rootless DVT location
-service connect/disconnect passed without sending coordinates. Physical iPhone
-set/refresh/restore, unplug recovery and Wi-Fi hardware validation remain pending.
+checked during development. On iOS 26.6.2, physical USB detection, preparation,
+rootless DVT connection, repeated set acknowledgements, joystick/route movement
+commands, pause/resume/loop and clear/cleanup passed. Independent phone-app GPS
+readback, physical unplug recovery and Wi-Fi set/refresh/clear remain pending.
 
 ## Implementation and licenses
 
