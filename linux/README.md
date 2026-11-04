@@ -42,6 +42,11 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 - Mapped walking excludes ferries and requires connected path geometry. Off-path
   pins connect to that geometry without replacing the entire walking leg with a
   straight shortcut. Map coverage determines the available mapped paths. GPX supports exact geometry.
+- Walking stops inside the same mapped building can connect indoors automatically
+  without snapping out to sidewalks. Connections stay within a simple building
+  outline and cover up to 300 metres (984 ft). This approximates indoor movement;
+  room walls, corridors and floor changes are not modeled. Missing footprints or
+  connections crossing outside a concave outline keep normal outdoor routing.
 - Automatic driving speed from mapped road speeds/limits and surface information,
   with acceleration and braking toward turns/lower limits. Missing data is labeled
   as an estimate. Manual speed overrides are available per segment. This estimates
@@ -168,7 +173,8 @@ with unresolved state.
 
 The map is local bundled Leaflet inside Qt WebEngine. There is no HTTP control
 server. Map views request OpenStreetMap tiles; submitted searches go to Photon;
-route planning sends selected stops to Valhalla, and driving speed lookup
+route planning sends selected stops to Valhalla and looks up nearby building
+footprints through bounded OpenStreetMap read requests (or a custom Overpass endpoint), and driving speed lookup
 sends planned route geometry to its trace-attributes endpoint. Driving-stop lookup
 sends road/node IDs to the OpenStreetMap read API for small segments, or to the
 configured Overpass server for larger/custom lookups. The services see

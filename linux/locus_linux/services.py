@@ -171,6 +171,38 @@ class Services:
             raise NoRouteFound(response.get("error", "No connected road route found. Try closer stops."))
         return results
 
+    async def indoor_connection(self, start, end, url=OVERPASS):
+        from .indoor import inside_connection
+        from .planning import SHORT_WALK_METRES
+        if distance(start, end) > SHORT_WALK_METRES:
+            return None
+        # Round outwards to reuse footprint lookups for nearby indoor stops.
+        import math
+        south, north = math.floor(min(start[0], end[0]) * 500) / 500, math.ceil(max(start[0], end[0]) * 500) / 500
+        west, east = math.floor(min(start[1], end[1]) * 500) / 500, math.ceil(max(start[1], end[1]) * 500) / 500
+        if east - west > .02 or north - south > .02 or south < -89.99 or north > 89.99:
+            return None
+        south, west, north, east = south - .002, max(-180, west - .002), north + .002, min(180, east + .002)
+        bbox = f'{south},{west},{north},{east}'
+        query = f'[out:json][timeout:12];way[building][building!=no]({bbox});out geom;'
+        try:
+            response = await self.get(f'{OSM_READ}/map.json', {'bbox': f'{west},{south},{east},{north}'}) if url == OVERPASS else await self.get(url, {'data': query})
+            nodes = {p['id']: p for p in response.get('elements', []) if p.get('type') == 'node'}
+            for element in response.get('elements', []):
+                if element.get('type') != 'way' or element.get('tags', {}).get('building') in (None, 'no'):
+                    continue
+                geometry = element.get('geometry') or [nodes[node] for node in element.get('nodes', []) if node in nodes]
+                if not element.get('geometry') and len(geometry) != len(element.get('nodes', [])):
+                    continue
+                ring = [coordinates(p['lat'], p['lon']) for p in geometry]
+                if len(ring) <= 1000 and inside_connection(start, end, ring):
+                    return {'points': [start, end],
+                            'speed_warning': 'Approximate indoor walking within one building; room walls and floors are not mapped.'}
+        except Exception:
+            # A failed footprint lookup must not prevent normal mapped walking.
+            return None
+        return None
+
     async def mixed_route(self, legs, url=VALHALLA, overpass_url=OVERPASS, include_stops=True):
         from .planning import specification, PROFILES, MAX_PINS, SHORT_WALK_METRES
         if not 1 <= len(legs) < MAX_PINS:
@@ -187,7 +219,10 @@ class Services:
             waypoints = [start, *spec["controls"], end]
             try:
                 short_walk = spec["profile"] == "walk_auto" and Route(waypoints).total <= SHORT_WALK_METRES
-                if profile["costing"]:
+                indoor = await self.indoor_connection(start, end, overpass_url) if spec['profile'] == 'walk_auto' and not spec['controls'] else None
+                if indoor:
+                    choices = [indoor]
+                elif profile["costing"]:
                     mode = {"auto": "Drive", "pedestrian": "Walk", "bicycle": "Cycle"}[profile["costing"]]
                     try:
                         choices = await self.route(waypoints, mode, url, profile["options"])

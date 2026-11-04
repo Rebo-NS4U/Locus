@@ -1,11 +1,17 @@
 """Mapped walking must not replace water crossings with ferry or gap geometry."""
 import json
 import unittest
+from unittest.mock import patch, AsyncMock
 
 from locus_linux.services import Services, encode_shape, NoRouteFound
 
 
 class WalkingTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        lookup = patch.object(Services, 'indoor_connection', new_callable=AsyncMock, return_value=None)
+        lookup.start()
+        self.addCleanup(lookup.stop)
+
     points = [(0, 0), (.001, 0), (.001, .002), (0, .002)]
 
     def trip(self):
