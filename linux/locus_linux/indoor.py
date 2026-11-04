@@ -58,3 +58,59 @@ def building_access(start, end, ring, max_access_metres=40):
         return False  # Do not cross an exterior gap in a concave outline.
     length = distance(start, end)
     return pieces[first][0] * length <= max_access_metres and (1 - pieces[last][1]) * length <= max_access_metres
+
+
+def walking_path(start, end, ring):
+    """Shortest approximate connection around a building's exterior corners."""
+    import heapq
+    from .routes import distance
+    if len(ring) < 4 or len(ring) > 180 or ring[0] != ring[-1]:
+        return None
+    if not any(contains(p, ring) for p in (start, end)):
+        return None
+    if inside_connection(start, end, ring) or building_access(start, end, ring):
+        return [start, end]
+    # Reject far outdoor endpoints before constructing an indoor graph.
+    import math
+    scale = math.cos(math.radians(start[0]))
+    for point in (start, end):
+        if contains(point, ring):
+            continue
+        gaps = []
+        for a, b in zip(ring, ring[1:]):
+            dx, dy = b[0] - a[0], (b[1] - a[1]) * scale
+            length = dx * dx + dy * dy
+            t = max(0, min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * scale * dy) / length)) if length else 0
+            gaps.append(distance(point, (a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]))))
+        if min(gaps) > 40:
+            return None
+    points = [start, end, *dict.fromkeys(ring[:-1])]
+    visibility = {}
+    queue, best = [(0., 0)], {0: (0., None)}
+    while queue:
+        cost, index = heapq.heappop(queue)
+        if cost > best[index][0]:
+            continue
+        if index == 1:
+            path = []
+            while index is not None:
+                path.append(points[index])
+                index = best[index][1]
+            return path[::-1]
+        for target, point in enumerate(points):
+            if target == index:
+                continue
+            a = points[index]
+            # Only an actual endpoint may have an outdoor approach. Interior
+            # graph edges stay in the footprint, including concave buildings.
+            access = index in (0, 1) or target in (0, 1)
+            key = tuple(sorted((index, target)))
+            if key not in visibility:
+                visibility[key] = inside_connection(a, point, ring) or (access and building_access(a, point, ring))
+            if not visibility[key]:
+                continue
+            candidate = cost + distance(a, point)
+            if candidate < best.get(target, (float('inf'), None))[0]:
+                best[target] = candidate, index
+                heapq.heappush(queue, (candidate, target))
+    return None

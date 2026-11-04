@@ -46,8 +46,8 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   without snapping out to sidewalks. Entry/exit connections also work when one
   stop is indoors and the other is within 40 metres (131 ft) of the footprint along
   the connection. Indoor connections cover up to 300 metres (984 ft). This approximates indoor movement;
-  room walls, corridors and floor changes are not modeled. Missing footprints or
-  connections crossing outside a concave outline keep normal outdoor routing.
+  room walls, corridors and floor changes are not modeled. Indoor paths turn around concave building corners instead of detouring outside.
+  Missing footprints keep normal outdoor routing. Connections do not infer doors.
 - Automatic driving speed from mapped road speeds/limits and surface information,
   with acceleration and braking toward turns/lower limits. Missing data is labeled
   as an estimate. Manual speed overrides are available per segment. This estimates
@@ -67,7 +67,8 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   a separate library view, quieter selection colors and always-reachable playback controls.
 - Colored, clickable segments with automatic path selection. Editable
   `.locus.json` projects retain stops, travel modes and speeds. Loading an older
-  project discards manual shape hints so routing is automatic.
+  project discards manual shape hints and normalizes old sidewalk/trail/free-path
+  settings to Walking, Driving or Cycling so routing is automatic.
 - GPX import/export for up to 50,000 points follows exact geometry, including
   off-road sections. GPX import accepts
   one track segment or route at a time and rejects separated segments rather
@@ -140,12 +141,13 @@ even with Controls hidden. Paths between stops are chosen automatically.
 Search, saved places and coordinate fields select coordinates without adding route
 pins. Map clicks do not send phone commands. **Set location** sends it to the selected phone. Check the result in Maps.
 Use Move for joystick/imported-GPX speed controls. On Route, add or drag pins,
-choose **Walking**, **Driving** or **Cycling** for each segment, then **Plan route**.
+choose **Walking**, **Driving** or **Cycling** for each segment. Paths refresh
+automatically after edits. **Plan route** remains available to retry.
 Name the route and press **Save route** (Ctrl+S) to keep it inside Locus.
 **Saved routes** opens your searchable library; double-click a route or press
 **Open** to restore it. Rename and delete are available there. Opening editable
-routes restores their stops and settings; Plan route rebuilds paths with current
-map data. GPX tracks reopen with their exact geometry. The last working draft is
+routes restores their stops and settings, then rebuilds paths automatically with
+current map data. GPX tracks reopen with their exact geometry. The last working draft is
 restored automatically on startup. File import/export remains in **Route ⋯**.
 The library is stored privately in `$XDG_STATE_HOME/locus-linux/routes.json`
 (default `~/.local/state/locus-linux/routes.json`); demo mode uses a separate library.

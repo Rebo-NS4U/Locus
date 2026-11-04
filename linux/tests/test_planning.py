@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from locus_linux.engine import Session
-from locus_linux.planning import RoutePlan, specification, TRAVEL_MODES, travel_mode
+from locus_linux.planning import RoutePlan, specification, TRAVEL_MODES, travel_mode, automatic_specification
 from locus_linux.routes import Route, distance
 from locus_linux.services import Services, encode_shape
 from test_engine import Transport
@@ -18,6 +18,17 @@ def candidate(points, speed=5, driving=False):
 
 
 class DocumentTests(unittest.TestCase):
+    def test_old_profiles_migrate_to_automatic_modes_without_manual_bends(self):
+        for profile, expected in (('walk_sidewalks', 'walk_auto'), ('walk_trails', 'walk_auto'),
+                                  ('offroad_walk', 'walk_auto'), ('car_tracks', 'car_roads'),
+                                  ('offroad_car', 'car_roads'), ('cycle_roads', 'cycle_paths')):
+            spec = automatic_specification({'profile': profile, 'controls': [(0, .001)],
+                                            'speed_mode': 'manual', 'speed_kph': 7})
+            self.assertEqual(spec['profile'], expected)
+            self.assertEqual(spec['controls'], [])
+            self.assertEqual(spec['speed_kph'], 7)
+        self.assertEqual(automatic_specification({'profile': 'offroad_walk'})['speed_kph'], 5.04)
+
     def test_three_modes_and_legacy_project_profiles(self):
         self.assertEqual(list(TRAVEL_MODES), ['Walking', 'Driving', 'Cycling'])
         for mode, profile in TRAVEL_MODES.items():

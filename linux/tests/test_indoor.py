@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import AsyncMock
 
-from locus_linux.indoor import inside_connection, building_access
+from locus_linux.indoor import inside_connection, building_access, walking_path
 from locus_linux.services import Services
 
 
@@ -26,6 +26,16 @@ class FootprintTests(unittest.TestCase):
     def test_building_access_cannot_jump_across_concave_exterior_gap(self):
         ring = [(0, 0), (0, .004), (.001, .004), (.001, .001), (.004, .001), (.004, 0), (0, 0)]
         self.assertFalse(building_access((.0005, .003), (.003, .0005), ring))
+
+    def test_concave_building_routes_around_corner_instead_of_outdoors(self):
+        ring = [(0, 0), (0, .004), (.001, .004), (.001, .001), (.004, .001), (.004, 0), (0, 0)]
+        start, end = (.0005, .003), (.003, .0005)
+        path = walking_path(start, end, ring)
+        self.assertIsNotNone(path)
+        self.assertGreater(len(path), 2)
+        self.assertEqual(path[0], start)
+        self.assertEqual(path[-1], end)
+        self.assertTrue(all(inside_connection(a, b, ring) for a, b in zip(path, path[1:])))
 
 
 
@@ -62,7 +72,7 @@ class IndoorServiceTests(unittest.IsolatedAsyncioTestCase):
                         'spec': {'profile': 'walk_auto'}}]))[0][0]
             self.assertEqual(option['points'], [start, end])
             self.assertEqual(option['connectors'], [])
-            self.assertIn('building entry/exit', option['speed_warning'])
+            self.assertIn('building access', option['speed_warning'])
             service.route.assert_not_awaited()
 
     async def test_default_osm_read_resolves_way_nodes(self):

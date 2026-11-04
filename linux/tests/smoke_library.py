@@ -9,6 +9,7 @@ os.environ['XDG_STATE_HOME'] = root.name
 os.environ['XDG_CACHE_HOME'] = root.name + '/cache'
 
 from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtTest import QTest
 from locus_linux.app import Window, Worker
 from locus_linux.library import RouteLibrary
 from locus_linux.planning import RoutePlan
@@ -17,6 +18,7 @@ app = QApplication([])
 path = Path(root.name) / 'locus-linux/demo-routes.json'
 plan = RoutePlan()
 plan.reset([(35, -111), (35.001, -111), (35.002, -111)])
+plan.update(0, {'profile': 'walk_sidewalks', 'controls': [(35.0005, -111)]})
 plan.update(1, {'profile': 'car_roads'})
 library = RouteLibrary(path)
 identifier = library.save_route('Campus', plan.serialize())
@@ -28,7 +30,22 @@ with patch.object(Worker, 'start'):
     assert first.route_title.text() == 'Campus'
     assert len(first.stops) == 3
     assert first.route_plan.spec(1)['profile'] == 'car_roads'
+    assert first.route_plan.spec(0)['profile'] == 'walk_auto'
+    assert not first.route_plan.spec(0)['controls']
     first.move_stop(0, 35.0001, -111)
+    assert first.auto_plan_timer.isActive()
+    first.ready = True
+    with patch.object(first, 'plan_route') as plan_call:
+        first.busy = True
+        first.auto_plan_timer.start(1)
+        QTest.qWait(50)
+        plan_call.assert_not_called()
+        first.busy = False
+        first.auto_plan_timer.start(1)
+        QTest.qWait(50)
+        plan_call.assert_called_once()
+    first.ready = False
+    first.auto_plan_timer.stop()
     second = Window(demo=True)
     second.busy = False
     assert second.stops[0] == (35.0001, -111)
@@ -41,6 +58,10 @@ with patch.object(Worker, 'start'):
     assert second.active_route_id is None
     track = {'format': 'locus-track', 'version': 1, 'points': [(35, -111), (35.001, -111), (35.002, -111)]}
     second.apply_route_document(track)
+    assert second.imported_track
+    with patch.object(second, 'plan_route') as plan_call:
+        second.refresh_automatic_route()
+        plan_call.assert_not_called()
     second.route_title.setText('Imported walk')
     second.save_library_route()
     second.new_library_route()

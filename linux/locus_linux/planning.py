@@ -51,6 +51,16 @@ def travel_mode(profile):
 
 
 
+def automatic_specification(value):
+    """Migrate old path variants to the user's three automatic travel modes."""
+    result = specification(value)
+    profile = TRAVEL_MODES[travel_mode(result['profile'])]
+    result.update(profile=profile, controls=[])
+    if result['speed_mode'] == 'auto':
+        result['speed_kph'] = PROFILES[profile]['speed']
+    return result
+
+
 def specification(value=None, default="walk_auto"):
     value = value or {}
     profile = value.get("profile", default)

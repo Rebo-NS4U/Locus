@@ -172,7 +172,7 @@ class Services:
         return results
 
     async def indoor_connection(self, start, end, url=OVERPASS):
-        from .indoor import inside_connection, building_access
+        from .indoor import walking_path
         from .planning import SHORT_WALK_METRES
         if distance(start, end) > SHORT_WALK_METRES:
             return None
@@ -197,12 +197,10 @@ class Services:
                 ring = [coordinates(p['lat'], p['lon']) for p in geometry]
                 if len(ring) > 1000:
                     continue
-                if inside_connection(start, end, ring):
-                    return {'points': [start, end],
-                            'speed_warning': 'Approximate indoor walking within one building; room walls and floors are not mapped.'}
-                if building_access(start, end, ring):
-                    return {'points': [start, end],
-                            'speed_warning': 'Approximate building entry/exit connection; doors, room walls and floors are not mapped.'}
+                path = walking_path(start, end, ring)
+                if path:
+                    return {'points': path,
+                            'speed_warning': 'Approximate indoor/building access walking; doors, room walls and floors are not mapped.'}
         except Exception:
             # A failed footprint lookup must not prevent normal mapped walking.
             return None

@@ -27,7 +27,7 @@ from .library import RouteLibrary
 from .services import Services, PHOTON, VALHALLA, OVERPASS, endpoint
 from .theme import apply_theme, read_colors
 from .units import to_mph, to_kph, speed_text, METRES_PER_MILE
-from .planning import RoutePlan, PROFILES, TRAVEL_MODES, travel_mode
+from .planning import RoutePlan, PROFILES, TRAVEL_MODES, travel_mode, automatic_specification
 from .activation import activate_existing, listen_for_activation
 
 
@@ -142,6 +142,11 @@ class Window(QMainWindow):
         self.planning_revision = None
         self.planning_document = None
         self.segment_loading = False
+        self.map_loaded = False
+        self.auto_plan_timer = QTimer(self)
+        self.auto_plan_timer.setSingleShot(True)
+        self.auto_plan_timer.setInterval(600)
+        self.auto_plan_timer.timeout.connect(self.refresh_automatic_route)
         self.imported_track = False
         self.motion = {"mode": "fixed", "connected": False}
         self.keys = set()
@@ -737,6 +742,7 @@ class Window(QMainWindow):
                 self.status.setText("Paths chosen automatically. Select a colored segment to change its travel mode.")
             except ValueError as error:
                 self.status.setText(speed_text(str(error)))
+                self.schedule_automatic_route()
         elif operation == "set_mode":
             self.devices.clear()
             self.status.setText(result)
@@ -837,17 +843,21 @@ class Window(QMainWindow):
         self.add_stop()
 
     def js(self, function, *args):
+        if not self.map_loaded:
+            return
         self.map.page().runJavaScript(function if not args else function + "(" + ",".join(json.dumps(arg) for arg in args) + ")")
 
     def preview(self):
         self.js("focusLocation", self.latitude.value(), self.longitude.value())
 
     def release_map(self):
+        self.map_loaded = False
         # Flush the disk cache on exit; Qt requires pages to die first.
         delete(self.map.page())
         delete(self.map_profile)
 
     def map_ready(self, ok):
+        self.map_loaded = ok
         if ok:
             if self.map.focusProxy():
                 self.map.focusProxy().installEventFilter(self)
@@ -855,6 +865,8 @@ class Window(QMainWindow):
             self.map_typography()
             self.map_options()
             self.redraw_route()
+            if self.stops:
+                self.js("fitRoute()")
 
     def map_typography(self):
         font = QApplication.instance().font()
@@ -1008,6 +1020,7 @@ class Window(QMainWindow):
         self.select_segment(self.selected_segment())
         self.rebuild_route()
         self.remember_route_draft()
+        self.schedule_automatic_route()
 
     def change_segment_travel(self, *unused):
         if not self.segment_loading:
@@ -1101,7 +1114,24 @@ class Window(QMainWindow):
         self.route_summary.setText(f"{source} · {route.total / METRES_PER_MILE:.2f} mi · {len(route.points)} points")
         self.redraw_route()
 
+    def schedule_automatic_route(self):
+        if not self.imported_track and len(self.stops) >= 2 and any(
+                not self.route_plan.results.get(self.route_plan.key(i)) for i in range(len(self.stops) - 1)):
+            self.auto_plan_timer.start()
+        else:
+            self.auto_plan_timer.stop()
+
+    def refresh_automatic_route(self):
+        if self.imported_track or len(self.stops) < 2 or self.closing:
+            return
+        if self.busy or not self.ready:
+            self.auto_plan_timer.start()
+            return
+        if self.editable_route():
+            self.plan_route()
+
     def plan_route(self):
+        self.auto_plan_timer.stop()
         if not self.busy and self.editable_route():
             self.planning_revision = self.route_plan.revision
             self.planning_document = self.route_plan
@@ -1185,7 +1215,7 @@ class Window(QMainWindow):
                 if len(value['pins']) == 1:
                     plan.add(value['pins'][0]['point'])
                 for index in range(len(plan.pins) - 1):
-                    plan.update(index, {**plan.spec(index), 'controls': []})
+                    plan.update(index, automatic_specification(plan.spec(index)))
                 self.route_plan = plan
                 self.stops_changed()
         finally:
@@ -1204,7 +1234,7 @@ class Window(QMainWindow):
             self.remember_route_draft()
             self.library_toggle.setChecked(False)
             self.js('fitRoute()')
-            self.status.setText('Route opened. Plan route to refresh the paths, then Start when ready.')
+            self.status.setText('Route opened. Paths refresh automatically. Press Start when ready.')
         except (OSError, ValueError, KeyError, StopIteration) as error:
             self.status.setText(f'Could not open route: {error}')
 
@@ -1272,12 +1302,12 @@ class Window(QMainWindow):
                 plan = RoutePlan.deserialize(json.loads(Path(path).read_text()))
                 # Old shape hints must not constrain automatic path selection.
                 for index in range(len(plan.pins) - 1):
-                    plan.update(index, {**plan.spec(index), "controls": []})
+                    plan.update(index, automatic_specification(plan.spec(index)))
                 self.active_route_id = None
                 self.route_title.setText(Path(path).stem)
                 self.route_plan = plan
                 self.stops_changed()
-                self.status.setText("Route project loaded. Plan segments to rebuild the paths.")
+                self.status.setText("Route project loaded. Refreshing paths automatically.")
             except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
                 self.status.setText(f"Could not load project: {error}")
 
