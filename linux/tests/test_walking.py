@@ -76,9 +76,27 @@ class WalkingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(option['points'], self.points)
         self.assertNotIn('speed_warning', option)
         options = calls[0]['costing_options']['pedestrian']
-        self.assertLess(options['sidewalk_factor'], 1)
+        self.assertEqual(options['sidewalk_factor'], 1)
+        self.assertEqual(options['driveway_factor'], 1)
+        self.assertEqual(options['alley_factor'], 1)
+        self.assertEqual(options['max_hiking_difficulty'], 1)
         self.assertLess(options['walkway_factor'], 1)
         self.assertEqual(options['use_tracks'], 1)
+
+    async def test_auto_walk_selects_shorter_path_over_sidewalk_detour(self):
+        start, end = (0, 0), (0, .002)
+        detour = [start, (.002, 0), (.002, .002), end]
+        trail = [start, (.0001, .001), end]
+        response = {'trip': {'status': 0, 'summary': {'time': 500},
+                            'legs': [{'shape': encode_shape(detour)}]},
+                    'alternates': [{'trip': {'status': 0, 'summary': {'time': 200},
+                                            'legs': [{'shape': encode_shape(trail)}]}}]}
+        options = (await Services(lambda *_: response).mixed_route([{
+            'start': start, 'end': end, 'spec': {'profile': 'walk_auto'}
+        }]))[0]
+        self.assertEqual(options[0]['points'], trail)
+        self.assertEqual(options[1]['points'], detour)
+        self.assertFalse(any(options[0]['motorized']))
 
     async def test_auto_walk_does_not_shortcut_rejected_ferry_or_disconnected_path(self):
         for bad in ('ferry', 'disconnected'):

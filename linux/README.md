@@ -34,7 +34,8 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   editor. Numbered stop/segment/shape sections group editing controls; the Route ⋯
   menu holds GPX, projects and clear actions.
 - Choose Walking, Driving or Cycling between each pair of up to 99 ordered,
-  draggable pins. Walking prefers mapped sidewalks and trails. A direct connection
+  draggable pins. Walking uses mapped sidewalks, trails and walking connections without favoring
+  long sidewalk detours. The shortest returned walking alternative is selected. A direct connection
   of up to 300 metres (984 ft) is used only when no mapped walking route is found.
   Each segment keeps its own travel mode, speed policy and alternatives. Insert a pin to split a
   segment and inherit its settings. Existing route projects remain compatible.
@@ -128,7 +129,8 @@ Search, saved places and coordinate fields select coordinates without adding rou
 pins. Map clicks do not send phone commands. **Set location** sends it to the selected phone. Check the result in Maps.
 Use Move for joystick/imported-GPX speed controls. On Route, add or drag pins,
 choose **Walking**, **Driving** or **Cycling** for each segment, then **Plan route**.
-Walking prefers mapped sidewalks and trails, including on short legs. When the
+Walking considers mapped sidewalks, trails, driveways and alleys with pedestrian
+access, including on short legs, and selects the shortest returned alternative. When the
 router finds no walking connection, legs up to 300 metres (984 ft) can connect
 directly; the segment labels this fallback. Network errors, ferries and disconnected
 route geometry do not trigger shortcuts. Driving and Cycling use their mapped networks.

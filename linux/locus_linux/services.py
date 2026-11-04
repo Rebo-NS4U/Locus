@@ -215,6 +215,10 @@ class Services:
                     options.append(option)
                 if not options:
                     raise ValueError(rejected[0] if rejected else "No usable segment alternatives")
+                if spec["profile"] == "walk_auto":
+                    # Provider preference costs can rank a longer sidewalk detour
+                    # first. Compare full walking distance, including pin access.
+                    options.sort(key=lambda option: option["distance"])
                 result.append(options)
             except Exception as error:
                 raise ValueError(f"Segment {number}: {error}") from error
