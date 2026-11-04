@@ -264,6 +264,12 @@ requests. It uses no phone or desktop session. Native GUI smoke tests and
 physical-device verification remain separate local checks. See the
 [Blueprint review](docs/blueprint-review.md).
 
+For isolated, repeatable runs, install tox in a development environment and run
+`tox -e lint,unit` from the repository root. The unit environment installs the
+Linux package and uses offscreen Qt; the lint environment checks Python syntax,
+invalid control flow, undefined names and unbound locals with Ruff. System Qt
+libraries and `desktop-file-utils` are still required, as in CI.
+
 ```sh
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/pip check
@@ -272,6 +278,12 @@ physical-device verification remain separate local checks. See the
 .venv/bin/python tests/smoke_map_cache.py  # local-server, cross-launch cache check
 .venv/bin/pip wheel --no-deps -w /tmp/locus-wheels .
 ```
+
+The main window is composed from focused modules: `app.py` owns startup and
+phone-operation coordination; `window_ui.py` and `route_panel.py` build controls;
+`window_routes.py`, `window_library.py` and `window_map.py` own their respective
+actions. `worker.py` owns background operations and `widgets.py` owns reusable
+controls. All remain part of the same installed Python package.
 
 Tests cover movement geometry, date-line/polar behavior, speed/loop/pause/restore,
 sleep and reconnection, recovery ownership, cancellation, GPX parsing/export,

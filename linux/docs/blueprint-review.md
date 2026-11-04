@@ -17,5 +17,21 @@ Its score is not a measure of phone compatibility or test coverage. Unit tests
 use doubles; the separate native GUI smoke tests and physical-device checks
 remain necessary for changes to those behaviors.
 
-No runtime source changed. The installed application needs no update or
-restart. The workflow becomes active when this commit is pushed.
+## Follow-up improvements
+
+- The large main-window module is separated by responsibility into window
+  layout, route controls, editing, library/file actions, map interaction,
+  reusable widgets and the background worker. Existing window methods keep
+  their bodies and decorators, and public imports from `app` remain available.
+- `tox.ini` provides isolated unit-test and lint environments. Ruff checks
+  runtime mistakes without rewriting existing formatting.
+- CI checks Ruff, runs the unit suite and builds the package containing the
+  new modules. Local GUI smoke tests cover the real composed window and route
+  library recovery with fake phone/network responses.
+
+The external scan helper originally omitted `sourceMetrics` despite passing
+source text. Corrected scans now compute those metrics like Blueprint's
+directory reader. Vendored `idevice.h` and Leaflet CSS still trigger file-size
+findings; do not rewrite third-party components just to improve that score.
+The single comment marker is the word `hack` in Leaflet CSS describing a tile
+rendering workaround; it does not identify an unfinished Locus feature.
