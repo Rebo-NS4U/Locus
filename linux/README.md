@@ -9,11 +9,16 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 - A persistent navigation rail opens Places, Routes, Movement, Map and Settings.
   Phone selection and device tools have their own toolbar below the location actions.
   Each workspace has a heading and a short description of its controls.
-- Route studio opens wider than the other workspaces and remembers each workspace's
-  panel width. Trip, Details and Library have separate views and scroll areas;
-  the route name, Save, file menu and playback dock stay fixed. Trip gives its
-  available space to the stop list. Double-click a row to open timing or travel
-  settings in Details. New route and file actions live in Route ⋯.
+- Route studio combines stop cards and their settings in one resizable workspace.
+  Each card shows its numbered stop, coordinates, wait rule and onward leg.
+  Selecting a card updates its departure and onward travel controls alongside
+  the trip. The final stop has no onward leg. Library remains a separate view.
+  The studio opens wider than other workspaces and remembers its width; on
+  windows narrower than 1100 pixels it uses the full workspace. Hide Controls
+  to return to the map. Narrow editor panes stack the trip and settings.
+  The route name, Save, file menu and playback dock stay fixed. Idle playback
+  status uses one line and expands for movement or traffic details.
+  New route and file actions live in Route ⋯.
   Its Trip options section contains There and back, Loop route and Show return stops.
   Short windows collapse the studio heading to leave more editing space.
   Timer values and units share one

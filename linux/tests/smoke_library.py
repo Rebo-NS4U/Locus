@@ -35,11 +35,11 @@ with patch.object(Worker, 'start'):
     assert not first.route_plan.spec(0)['controls']
     first.there_and_back.setChecked(True)
     assert first.route_plan.leg_count == 4
-    first.route_list.setCurrentRow(2)
-    first.route_list.itemDoubleClicked.emit(first.route_list.currentItem())
-    assert first.studio_sections.currentIndex() == 1
+    first.route_list.setCurrentRow(1)
+    assert first.studio_sections.currentIndex() == 0
     assert 'Stop 02' in first.selection_context.text()
-    first.studio_sections.setCurrentIndex(2)
+    assert first.departure_group.isEnabled() and first.segment_group.isEnabled()
+    first.studio_sections.setCurrentIndex(1)
     assert first.library_toggle.isChecked()
     first.library_toggle.setChecked(False)
     assert first.studio_sections.currentIndex() == 0
@@ -51,14 +51,14 @@ with patch.object(Worker, 'start'):
     assert first.route_plan.pins[1]['departure']['seconds'] == 300
     assert first.departure_seconds.value() == 5
     assert first.departure_seconds.maximum() == 10080
-    first.return_edit.setChecked(True)
-    assert first.route_list.count() == 9
-    first.route_list.setCurrentRow(6)
-    assert first.selected_stop() == 1
-    assert first.selection_editor.currentIndex() == 0
-    first.route_list.setCurrentRow(5)
-    assert first.selection_editor.currentIndex() == 1
     first.route_list.setCurrentRow(2)
+    assert first.selected_segment() == 1
+    assert 'Turnaround' in first.selection_context.text()
+    first.return_edit.setChecked(True)
+    assert first.route_list.count() == 5
+    first.route_list.setCurrentRow(3)
+    assert first.selected_stop() == 1
+    first.route_list.setCurrentRow(1)
     first.departure_mode.setCurrentIndex(first.departure_mode.findData('clock'))
     first.departure_time.hour.setCurrentIndex(first.departure_time.hour.findData(4))
     first.departure_time.minute.setCurrentIndex(first.departure_time.minute.findData(30))

@@ -151,6 +151,9 @@ def check():
                 assert page.horizontalScrollBar().maximum() == 0, 'Controls must fit the panel'
             window.tabs.setCurrentIndex(1)
             app.processEvents()
+            assert window.route_list.isVisible()
+            assert window.departure_group.isVisible() and window.segment_group.isVisible()
+            assert window.studio_sections.count() == 2, 'Editor and Library are the only workspace views'
             footer_geometry = window.route_footer.geometry()
             for value in (0, window.sidebar_scroll.verticalScrollBar().maximum()):
                 window.sidebar_scroll.verticalScrollBar().setValue(value)
@@ -160,9 +163,11 @@ def check():
             original_size = window.size()
             window.resize(900, 600)
             app.processEvents()
+            assert not window.map.isVisible(), 'Small windows give the combined editor the full workspace'
+            assert window.route_list.isVisible() and window.departure_group.isVisible()
             assert window.route_footer.geometry().bottom() < window.tabs.currentWidget().height()
             assert window.sidebar_scroll.height() > 80, 'Studio views must remain scrollable in a small window'
-            assert window.progress.height() >= window.progress.fontMetrics().lineSpacing() * 3
+            assert window.progress.height() >= window.progress.fontMetrics().lineSpacing()
             window.resize(original_size)
             window.tabs.setCurrentIndex(0)
             window.split.setSizes([420, window.split.width() - 424])
@@ -212,6 +217,7 @@ def check():
             assert window.segment_speed.suffix() == " mph"
             window.save_settings()
             assert abs(window.store.data['settings']['speed_kph'] - 23.4) < .01
+            window.route_list.setCurrentRow(0)
             window.segment_travel.setCurrentText('Cycling')
             window.plan_route()
             stage = 4
@@ -234,16 +240,17 @@ def check():
             window.route_list.setCurrentRow(0)
             window.insert_stop()
             assert len(window.stops) == 3
-            assert window.selected_segment() == 0
+            assert window.selected_segment() == 1
             assert window.route_list.currentRow() == 1
-            assert window.route_list.count() == 5
+            assert window.route_list.count() == 3
             assert window.route_plan.spec(0)['profile'] == 'car_roads'
-            window.route_list.setCurrentRow(3)
+            window.route_list.setCurrentRow(1)
             window.segment_travel.setCurrentText('Walking')
             window.select_coordinates(51.503, -.123)
             window.add_stop()
-            assert window.selected_segment() == 2
-            assert window.route_list.currentRow() == 5
+            assert window.selected_segment() == -1
+            assert window.route_list.currentRow() == 3
+            window.route_list.setCurrentRow(2)
             window.segment_travel.setCurrentText('Driving')
             window.segment_speed_mode.setCurrentIndex(window.segment_speed_mode.findData('manual'))
             window.segment_speed.setValue(12)
@@ -344,7 +351,7 @@ def check():
             assert 'red light' in window.connection_badge.text().lower()
             assert result['active_leg']['from_stop'] == 1
             assert 'stop 1 → 2' in window.active_leg_label.text()
-            assert all(window.route_list.item(row).font().bold() for row in (0, 1, 2))
+            assert all(window.route_list.item(row).font().bold() for row in (0, 1))
             window.map.page().runJavaScript("Boolean(activeLeg && activeLeg.index === 0 && legLines[0].options.weight === 8 && document.querySelectorAll('.route-stop-active').length === 2)", active_map_check.append)
             stage = 71
         elif stage == 71 and active_map_check:

@@ -148,7 +148,7 @@ class WindowUiMixin(RoutePanelMixin):
                 # The studio owns scrolling per view; its header and dock stay fixed.
                 scroll.takeWidget()
                 scroll.deleteLater()
-                self.tab_scrolls[-1] = self.studio_sections.widget(0)
+                self.tab_scrolls[-1] = self.editor_split.widget(1)
                 route_page = QWidget()
                 route_layout = QVBoxLayout(route_page)
                 route_layout.setContentsMargins(0, 0, 0, 0)
@@ -159,7 +159,7 @@ class WindowUiMixin(RoutePanelMixin):
             else:
                 self.tabs.addTab(scroll, title)
         self.sidebar_width = 440
-        self.workspace_widths = {1: 620}
+        self.workspace_widths = {1: 860}
         self.inspector_index = 0
         self.tabs.hide()
         split.addWidget(self.tabs)
@@ -204,7 +204,8 @@ class WindowUiMixin(RoutePanelMixin):
     @property
     def sidebar_scroll(self):
         if self.tabs.currentIndex() == 1:
-            return self.studio_sections.currentWidget()
+            return (self.editor_split.widget(1) if self.studio_sections.currentIndex() == 0
+                    else self.studio_sections.currentWidget())
         return self.tab_scrolls[self.tabs.currentIndex()]
 
     def open_workspace(self, index):
@@ -222,6 +223,17 @@ class WindowUiMixin(RoutePanelMixin):
             if self.tabs.isVisible():
                 self.split.setSizes([self.sidebar_width, max(300, self.split.width() - self.sidebar_width - 12)])
             QTimer.singleShot(100, lambda: self.js('map.invalidateSize({pan:false})'))
+        self.fit_route_workspace()
+
+    def fit_route_workspace(self):
+        if not hasattr(self, 'map'):
+            return
+        # Give the combined editor the full workspace on smaller displays.
+        self.map.setVisible(not (self.tabs.isVisible() and self.tabs.currentIndex() == 1 and self.width() < 1100))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.fit_route_workspace()
 
     def toggle_sidebar(self, visible):
         self.release_keys()
@@ -229,6 +241,7 @@ class WindowUiMixin(RoutePanelMixin):
             self.sidebar_width = self.split.sizes()[0]
             self.workspace_widths[self.tabs.currentIndex()] = self.sidebar_width
         self.tabs.setVisible(visible)
+        self.fit_route_workspace()
         if visible:
             self.split.setSizes([self.sidebar_width, max(400, self.split.width() - self.sidebar_width - 4)])
         try:

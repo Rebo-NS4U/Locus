@@ -1,23 +1,42 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Roomy route workspace with separate trip, details and library views."""
-from PySide6.QtCore import QTime, Qt
+"""Stop cards and their settings share one resizable route workspace."""
+from PySide6.QtCore import QTime, Qt, QSize
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
                               QComboBox, QDoubleSpinBox, QLineEdit, QListWidget,
                               QGroupBox, QCheckBox, QSizePolicy, QToolButton, QMenu,
-                              QSpinBox, QTabWidget, QScrollArea, QLayout, QWidgetAction)
+                              QSpinBox, QTabWidget, QScrollArea, QLayout, QWidgetAction, QSplitter, QFrame, QListWidgetItem, QStyledItemDelegate, QStyleOptionViewItem, QStyle)
 from .planning import TRAVEL_MODES
 from .widgets import DepartureTimePicker, StatusLabel
+
+
+class StopCardDelegate(QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        # Keep native selection and accessibility; the card supplies visible text.
+        styled = QStyleOptionViewItem(option)
+        self.initStyleOption(styled, index)
+        styled.text = ''
+        option.widget.style().drawControl(QStyle.ControlElement.CE_ItemViewItem, styled, painter, option.widget)
+
+
+class RouteProgressLabel(StatusLabel):
+    def setText(self, message):
+        super().setText(message)
+        lines = min(3, str(message).count('\n') + 1)
+        self.setFixedHeight(self.fontMetrics().lineSpacing() * lines + 4)
 
 
 class RouteStudioPage(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         compact = event.size().height() < 400
-        self.layout().itemAt(0).widget().setVisible(not compact)
-        self.layout().itemAt(1).widget().setVisible(not compact)
+        self.heading.setVisible(not compact)
         self.trip_hint.setVisible(not compact)
         self.layout().setSpacing(8 if compact else 16)
+        orientation = Qt.Orientation.Horizontal if event.size().width() >= 700 else Qt.Orientation.Vertical
+        if self.editor_split.orientation() != orientation:
+            self.editor_split.setOrientation(orientation)
+            self.editor_split.setSizes([240, 300] if orientation == Qt.Orientation.Vertical else [340, 420])
 
 
 class RoutePanelMixin:
@@ -34,7 +53,9 @@ class RoutePanelMixin:
         box.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         box.setContentsMargins(12, 8, 12, 8)
         box.setSpacing(16)
-        self.page_heading(box, 'Route studio', 'Choose your stops, then fine-tune the trip.')
+        page.heading = QLabel('Route studio')
+        page.heading.setObjectName('sectionTitle')
+        box.addWidget(page.heading)
         name_row = QHBoxLayout()
         name_row.setSpacing(12)
         self.route_title = QLineEdit()
@@ -55,7 +76,13 @@ class RoutePanelMixin:
         stops_box.setContentsMargins(4, 12, 4, 4)
         stops_box.setSpacing(10)
         self.route_stop_card = trip
-        self.studio_page(trip, 'Trip')
+        self.editor_split = QSplitter()
+        page.editor_split = self.editor_split
+        self.editor_split.setHandleWidth(12)
+        self.editor_split.setChildrenCollapsible(False)
+        self.editor_split.addWidget(trip)
+        self.editor_split.setStretchFactor(0, 1)
+        self.studio_sections.addTab(self.editor_split, 'Route editor')
         trip_options_widget = QWidget()
         option_box = QVBoxLayout(trip_options_widget)
         option_box.setContentsMargins(12, 10, 12, 10)
@@ -76,19 +103,21 @@ class RoutePanelMixin:
         self.return_edit.toggled.connect(self.toggle_return_editor)
         self.return_edit.hide()
         option_box.addWidget(self.return_edit)
-        hint = QLabel('Click the map to add stops. Double-click a row for details.')
+        hint = QLabel('Your stops · click the map to add another')
         hint.setObjectName('subtitle')
         hint.setWordWrap(True)
         page.trip_hint = hint
         stops_box.addWidget(hint)
         self.route_list = QListWidget()
+        self.route_list.setObjectName('routeStops')
+        self.route_list.setItemDelegate(StopCardDelegate(self.route_list))
         self.route_list.setMinimumHeight(120)
         self.route_list.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         self.route_list.setWordWrap(True)
         self.route_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.route_list.setToolTip('Select a stop or segment. Open Details to edit timing, travel mode and speed.')
+        self.route_list.setToolTip('Select a stop card to edit its wait and onward travel settings alongside the trip.')
+        self.route_list.setSpacing(6)
         self.route_list.currentRowChanged.connect(lambda: self.select_segment(self.selected_segment()))
-        self.route_list.itemDoubleClicked.connect(lambda item: self.studio_sections.setCurrentIndex(1))
         stops_box.addWidget(self.route_list, 1)
         row = QHBoxLayout()
         row.setSpacing(8)
@@ -112,21 +141,22 @@ class RoutePanelMixin:
         details_box = QVBoxLayout(details)
         details_box.setContentsMargins(4, 16, 4, 4)
         details_box.setSpacing(16)
-        self.selection_context = QLabel('Select a stop or segment in Trip to edit it here.')
+        self.selection_context = QLabel('Select a stop to set its timing and next leg.')
         self.selection_context.setObjectName('sectionTitle')
         self.selection_context.setWordWrap(True)
         details_box.addWidget(self.selection_context)
-        self.selection_editor = QTabWidget()
-        self.selection_editor.setObjectName('selectionEditor')
-        details_box.addWidget(self.selection_editor)
-        details_box.addStretch()
-        self.studio_page(details, 'Details')
+        details_scroll = QScrollArea()
+        details_scroll.setWidgetResizable(True)
+        details_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        details_scroll.setWidget(details)
+        self.editor_split.addWidget(details_scroll)
+        self.editor_split.setStretchFactor(1, 1)
         self.departure_group = QGroupBox('Departure')
+        self.departure_group.setObjectName('stopSettings')
         departure_layout = QVBoxLayout(self.departure_group)
-        departure_layout.setContentsMargins(16, 28, 16, 18)
-        departure_layout.setSpacing(16)
+        departure_layout.setContentsMargins(12, 16, 12, 12)
+        departure_layout.setSpacing(10)
         departure_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        departure_layout.addWidget(QLabel('When should this stop end?'))
         self.departure_mode = QComboBox()
         for label, mode in [('Pass through', 'none'), ('Wait for Continue', 'manual'),
                             ('Wait for a timer', 'timer'), ('Leave at a time of day', 'clock')]:
@@ -156,21 +186,24 @@ class RoutePanelMixin:
             signal.connect(self.update_departure)
         self.departure_unit.currentIndexChanged.connect(self.change_timer_unit)
         self.departure_group.setEnabled(False)
-        self.selection_editor.addTab(self.departure_group, 'Stop timing')
+        details_box.addWidget(self.departure_group)
 
-        self.segment_group = QGroupBox('Travel between stops')
+        self.segment_group = QGroupBox('Onward travel')
+        self.segment_group.setObjectName('legSettings')
         editor = QVBoxLayout(self.segment_group)
-        editor.setContentsMargins(16, 28, 16, 18)
-        editor.setSpacing(16)
+        editor.setContentsMargins(12, 16, 12, 12)
+        editor.setSpacing(10)
         editor.setAlignment(Qt.AlignmentFlag.AlignTop)
-        editor.addWidget(QLabel('Travel mode'))
+        travel_row = QHBoxLayout()
+        travel_row.addWidget(QLabel('Travel'))
         self.segment_travel = QComboBox()
         self.segment_travel.addItems(list(TRAVEL_MODES))
-        editor.addWidget(self.segment_travel)
+        travel_row.addWidget(self.segment_travel, 1)
+        editor.addLayout(travel_row)
         self.segment_travel.currentTextChanged.connect(self.change_segment_travel)
-        editor.addWidget(QLabel('Speed'))
         speed_row = QHBoxLayout()
         speed_row.setSpacing(12)
+        speed_row.addWidget(QLabel('Speed'))
         self.segment_speed_mode = QComboBox()
         self.segment_speed_mode.addItem('Auto speed', 'auto')
         self.segment_speed_mode.addItem('Manual speed', 'manual')
@@ -187,16 +220,24 @@ class RoutePanelMixin:
         self.route_options.setMinimumContentsLength(12)
         self.route_options.currentIndexChanged.connect(self.choose_route)
         self.route_options.setPlaceholderText('Plan to compare paths')
-        editor.addWidget(QLabel('Path'))
-        editor.addWidget(self.route_options)
+        path_row = QHBoxLayout()
+        path_row.addWidget(QLabel('Path'))
+        path_row.addWidget(self.route_options, 1)
+        editor.addLayout(path_row)
         self.segment_info = QLabel('Select a segment in Trip to edit its routing and speed.')
         self.segment_info.setObjectName('subtitle')
         self.segment_info.setWordWrap(True)
+        info_toggle = QPushButton('Route information')
+        info_toggle.setCheckable(True)
+        self.segment_info.hide()
+        info_toggle.toggled.connect(self.segment_info.setVisible)
+        editor.addWidget(info_toggle)
         editor.addWidget(self.segment_info)
         self.segment_group.setEnabled(False)
         for signal in (self.segment_speed_mode.currentIndexChanged, self.segment_speed.valueChanged):
             signal.connect(self.update_segment)
-        self.selection_editor.addTab(self.segment_group, 'Travel & speed')
+        details_box.addWidget(self.segment_group)
+        details_box.addStretch()
 
         self.library_panel = QWidget()
         library_layout = QVBoxLayout(self.library_panel)
@@ -223,7 +264,7 @@ class RoutePanelMixin:
         self.library_toggle = QPushButton(page)
         self.library_toggle.setCheckable(True)
         self.library_toggle.hide()
-        self.library_toggle.toggled.connect(lambda visible: self.studio_sections.setCurrentIndex(2 if visible else 0))
+        self.library_toggle.toggled.connect(lambda visible: self.studio_sections.setCurrentIndex(1 if visible else 0))
         self.studio_sections.currentChanged.connect(self.sync_studio_section)
         self.refresh_route_library()
 
@@ -274,13 +315,42 @@ class RoutePanelMixin:
         self.active_leg_label.setWordWrap(True)
         self.active_leg_label.hide()
         footer.addWidget(self.active_leg_label)
-        self.progress = StatusLabel('Not following a route')
+        self.progress = RouteProgressLabel()
+        self.progress.setText('Not following a route')
         self.progress.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        self.progress.setFixedHeight(self.progress.fontMetrics().lineSpacing() * 3 + 4)
         footer.addWidget(self.progress)
         return page
 
     def sync_studio_section(self, index):
         self.library_toggle.blockSignals(True)
-        self.library_toggle.setChecked(index == 2)
+        self.library_toggle.setChecked(index == 1)
         self.library_toggle.blockSignals(False)
+
+    def add_stop_card(self, number, title, coordinate, timing, onward):
+        text = f'{title}\n{coordinate}\n{timing}\n{onward}'
+        item = QListWidgetItem(text)
+        item.setToolTip(text)
+        self.route_list.addItem(item)
+        card = QFrame()
+        card.setObjectName('stopCard')
+        row = QHBoxLayout(card)
+        row.setContentsMargins(12, 12, 12, 12)
+        row.setSpacing(12)
+        badge = QLabel(f'{number:02d}')
+        badge.setObjectName('stopBadge')
+        badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        badge.setFixedSize(36, 36)
+        row.addWidget(badge, 0, Qt.AlignmentFlag.AlignTop)
+        content = QVBoxLayout()
+        content.setSpacing(5)
+        for value, role in [(title, 'stopTitle'), (coordinate, 'subtitle'),
+                            (timing, 'subtitle'), (onward, 'stopLeg')]:
+            label = QLabel(value)
+            label.setObjectName(role)
+            label.setWordWrap(True)
+            label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+            content.addWidget(label)
+        row.addLayout(content, 1)
+        card.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        item.setSizeHint(QSize(0, 154))
+        self.route_list.setItemWidget(item, card)

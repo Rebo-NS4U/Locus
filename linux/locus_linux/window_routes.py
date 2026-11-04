@@ -40,7 +40,7 @@ class RouteEditorMixin:
                 index = selected + 1 if selected >= 0 else len(self.stops)
                 default = {"Drive": "car_roads", "Cycle": "cycle_paths", "Run": "run_paths"}.get(self.travel_mode.currentText(), "walk_auto")
                 self.route_plan.insert(index, (self.latitude.value(), self.longitude.value()), default)
-                self.stops_changed(selected_row=max(0, 2 * index - 1))
+                self.stops_changed(selected_row=index)
             except ValueError as error:
                 self.status.setText(speed_text(str(error)))
 
@@ -63,7 +63,7 @@ class RouteEditorMixin:
         if self.editable_route() and index >= 0 and 0 <= target < len(self.stops):
             self.route_plan.reorder(index, target)
             self.stops_changed()
-            self.route_list.setCurrentRow(2 * target)
+            self.route_list.setCurrentRow(target)
 
     def clear_route(self):
         if self.editable_route():
@@ -72,7 +72,7 @@ class RouteEditorMixin:
 
     def selected_stop(self):
         row = self.route_list.currentRow()
-        index = row // 2 if row >= 0 else -1
+        index = row
         if index >= len(self.stops) and self.return_edit.isChecked():
             index = 2 * len(self.stops) - 2 - index
         return index
@@ -86,8 +86,10 @@ class RouteEditorMixin:
         row = self.route_list.currentRow()
         if row < 0 or len(self.stops) < 2:
             return -1
-        index = max(0, (row - 1) // 2)
-        if self.return_edit.isChecked() and index >= len(self.stops) - 1:
+        if row >= len(self.route_plan.visits) - 1:
+            return -1
+        index = row
+        if self.route_plan.there_and_back and index >= len(self.stops) - 1:
             index = 2 * (len(self.stops) - 1) - 1 - index
         return index
 
@@ -105,20 +107,35 @@ class RouteEditorMixin:
         if not self.route_plan.there_and_back:
             self.return_edit.setChecked(False)
         if select_newest:
-            selected_row = max(0, 2 * len(self.stops) - 3)
+            selected_row = len(self.stops) - 1
         self.route_list.blockSignals(True)
         self.route_list.clear()
         display_stops = self._editor_stops()
         for i, point in enumerate(display_stops):
             pin_index = i if i < len(self.stops) else 2 * len(self.stops) - 2 - i
             rule = self.route_plan.pins[pin_index].get('departure', {'mode': 'none'})
-            marker = {'none': '', 'manual': ' · Continue', 'timer': ' · timer', 'clock': ' · scheduled'}[rule['mode']]
-            self.route_list.addItem(f"{'Return · ' if i >= len(self.stops) else ''}Stop {pin_index + 1:02d}{marker}   {point[0]:.5f}, {point[1]:.5f}")
-            if i < len(display_stops) - 1:
+            seconds = rule.get('seconds', 0)
+            duration = next((f'{seconds / factor:g} {unit}' for factor, unit in
+                             [(86400, 'days'), (3600, 'hours'), (60, 'minutes'), (1, 'seconds')]
+                             if seconds >= factor and seconds % factor == 0), f'{seconds:g} seconds')
+            timing = {'none': 'Pass through', 'manual': 'Wait for Continue',
+                      'timer': f'Wait {duration}',
+                      'clock': f"Leave at {rule.get('time', '')}"}[rule['mode']]
+            onward = 'End of trip'
+            if i < len(self.route_plan.visits) - 1:
                 leg_index = i if i < len(self.stops) - 1 else 2 * (len(self.stops) - 1) - 1 - i
                 spec = self.route_plan.spec(leg_index)
                 ready = bool(self.route_plan.results.get(self.route_plan.key(leg_index)))
-                self.route_list.addItem(f"    {i + 1} → {i + 2} · {travel_mode(spec['profile'])} · {'ready' if ready else 'needs plan'}")
+                destination = self.route_plan.visits[i + 1]
+                onward = f"To stop {destination + 1:02d} · {travel_mode(spec['profile'])} · {'Ready' if ready else 'Needs planning'}"
+            title = f"{'Return · ' if i >= len(self.stops) else ''}Stop {pin_index + 1:02d}"
+            if i == 0:
+                title += ' · Start'
+            elif i == len(self.route_plan.visits) - 1:
+                title += ' · Finish'
+            elif self.route_plan.there_and_back and i == len(self.stops) - 1:
+                title += ' · Turnaround'
+            self.add_stop_card(pin_index + 1, title, f'{point[0]:.5f}, {point[1]:.5f}', timing, onward)
         if self.route_list.count():
             self.route_list.setCurrentRow(min(selected_row, self.route_list.count() - 1))
         self.route_list.blockSignals(False)
@@ -179,9 +196,9 @@ class RouteEditorMixin:
         self.route_options.blockSignals(False)
         self.segment_loading = False
         self.select_departure()
-        self.selection_editor.setCurrentIndex(0 if self.route_list.currentRow() % 2 == 0 else 1)
         item = self.route_list.currentItem()
-        self.selection_context.setText(item.text().strip() if item else 'Select a stop or segment in Trip to edit it here.')
+        self.selection_context.setText(item.text().split('\n')[0] if item else 'Select a stop to edit its timing and next leg.')
+        self.segment_group.setTitle('Onward travel' if valid else 'No onward leg · end of trip')
         self.redraw_route()
 
     def select_departure(self):
@@ -242,12 +259,13 @@ class RouteEditorMixin:
             self.select_segment(index)
 
     def select_map_segment(self, index):
-        if index >= len(self.stops) - 1 and self.route_plan.there_and_back:
-            index = 2 * (len(self.stops) - 1) - 1 - index
-        if 0 <= index < len(self.stops) - 1:
+        if 0 <= index < self.route_plan.leg_count:
             self.sidebar_toggle.setChecked(True)
             self.tabs.setCurrentIndex(1)
-            self.route_list.setCurrentRow(2 * index + 1)
+            if index >= len(self.stops) - 1:
+                self.return_edit.setChecked(True)
+            self.studio_sections.setCurrentIndex(0)
+            self.route_list.setCurrentRow(index)
 
     def rebuild_route(self):
         self.route_points, self.route_profile = [], None

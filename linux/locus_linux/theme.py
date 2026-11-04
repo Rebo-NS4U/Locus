@@ -94,6 +94,12 @@ def apply_theme(app, colors=None):
         QPushButton#navigationItem { text-align: left; padding: 12px 14px; }
         QWidget#playbackDock { background: %(card)s; border: 1px solid %(edge)s; border-radius: 14px; }
         QLabel#sectionTitle { color: %(accent)s; font-weight: 700; padding: 4px 8px; }
+        QFrame#stopCard { background: transparent; }
+        QLabel#stopBadge { background: %(button)s; color: %(accent)s; border-radius: 12px; font-weight: 700; }
+        QLabel#stopTitle { font-weight: 700; }
+        QLabel#stopLeg { color: %(accent)s; }
+        QListWidget#routeStops::item { padding: 0; }
+        QGroupBox#stopSettings, QGroupBox#legSettings { padding: 8px; margin-top: 12px; border-radius: 12px; }
         QLabel#brand { color: %(accent)s; font-size: 16px; font-weight: 700; padding: 0 8px 0 0; }
         QLabel#pageTitle { font-size: 23px; font-weight: 700; padding-top: 8px; padding-bottom: 3px; }
         QLineEdit#routeName { font-size: 16px; font-weight: 600; padding: 10px; border-color: %(edge)s; }

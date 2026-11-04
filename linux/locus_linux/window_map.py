@@ -50,11 +50,10 @@ class MapInteractionMixin:
             self.active_leg_label.setText(f"Active: stop {leg['from_stop']} → {leg['to_stop']} · {leg.get('mode', '')}")
         rows = set()
         if leg:
-            index = leg['index']
-            outward = len(self.stops) - 1
-            if index >= outward:
-                index = 2 * outward - 1 - index
-            rows = {2 * (leg['from_stop'] - 1), 2 * (leg['to_stop'] - 1), 2 * index + 1}
+            if self.return_edit.isChecked():
+                rows = {leg['index'], leg['index'] + 1}
+            else:
+                rows = {leg['from_stop'] - 1, leg['to_stop'] - 1}
         color = QColor(self.colors['accent'])
         color.setAlpha(70)
         for row in range(self.route_list.count()):
