@@ -33,6 +33,8 @@ with patch.object(Worker, 'start'):
     assert first.route_plan.spec(1)['profile'] == 'car_roads'
     assert first.route_plan.spec(0)['profile'] == 'walk_auto'
     assert not first.route_plan.spec(0)['controls']
+    first.there_and_back.setChecked(True)
+    assert first.route_plan.leg_count == 4
     first.route_list.setCurrentRow(2)
     first.departure_mode.setCurrentIndex(first.departure_mode.findData('timer'))
     first.departure_seconds.setValue(90)
@@ -65,6 +67,8 @@ with patch.object(Worker, 'start'):
     second = Window(demo=True)
     second.busy = False
     assert second.stops[0] == (35.0001, -111)
+    assert second.there_and_back.isChecked()
+    assert second.route_plan.there_and_back
     assert second.route_title.text() == 'Campus'
     assert second.route_plan.pins[1]['departure'] == {'mode': 'clock', 'time': '16:30'}
     second.library_list.setCurrentRow(0)
@@ -79,11 +83,16 @@ with patch.object(Worker, 'start'):
     with patch.object(second, 'plan_route') as plan_call:
         second.refresh_automatic_route()
         plan_call.assert_not_called()
+    second.there_and_back.setChecked(True)
+    assert second.route_points == track['points'] + track['points'][-2::-1]
     second.route_title.setText('Imported walk')
     second.save_library_route()
     second.new_library_route()
     second.open_library_route()
-    assert second.imported_track and len(second.route_points) == 3
+    assert second.imported_track and len(second.route_points) == 5
+    assert second.there_and_back.isChecked()
+    second.there_and_back.setChecked(False)
+    assert second.route_points == track['points']
     assert second.route_title.text() == 'Imported walk'
     for window in (second, first):
         window.close()

@@ -34,7 +34,7 @@ window.setRoute = (points, stops, segments = [], selected = -1) => {
   const pieces = segments.length ? segments : [{points: points.length ? points : stops, ready: Boolean(points.length), color: palette.accent, controls: [], label: 'Route'}];
   pieces.forEach((segment, index) => {
     const line = L.polyline(segment.points, {segmentColor: segment.color, color: segment.color, weight: index === selected ? 6 : 4, opacity: segment.ready ? 0.9 : 0.5, dashArray: segment.ready ? null : '6,8', bubblingMouseEvents: false}).addTo(routeLine);
-    line.bindTooltip(`${index + 1} → ${index + 2} · ${segment.label}${segment.ready ? '' : ' · needs planning'}`);
+    line.bindTooltip(`${segment.from_stop || index + 1} → ${segment.to_stop || index + 2} · ${segment.label}${segment.ready ? '' : ' · needs planning'}`);
     if (segments.length) line.on('click', () => { if (bridge) bridge.selectLeg(index); });
     (segment.connectors || []).forEach(connector => L.polyline(connector, {segmentColor: '#efdfd6', color: '#efdfd6', weight: 4, dashArray: '3,5'}).bindTooltip('Direct connector from pin to mapped path').addTo(routeLine));
     (segment.stops || []).forEach(stop => {

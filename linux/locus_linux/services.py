@@ -251,7 +251,7 @@ class Services:
         if prefix or suffix:
             option['garage_warning'] = 'Mapped vehicle access roads; movement within the garage is approximate (floors and ramps are not modeled).'
 
-    async def mixed_route(self, legs, url=VALHALLA, overpass_url=OVERPASS, include_stops=True):
+    async def mixed_route(self, legs, url=VALHALLA, overpass_url=OVERPASS, include_stops=True, there_and_back=False):
         from .planning import specification, PROFILES, MAX_PINS, SHORT_WALK_METRES
         if not 1 <= len(legs) < MAX_PINS:
             raise ValueError(f"A mixed route needs 2–{MAX_PINS} main pins")
@@ -261,6 +261,11 @@ class Services:
             start, end = coordinates(*leg["start"]), coordinates(*leg["end"])
             Route([start, *spec["controls"], end])
             validated.append((start, end, spec))
+        if type(there_and_back) is not bool:
+            raise ValueError('There and back must be on or off')
+        if there_and_back:
+            validated += [(end, start, {**spec, 'controls': list(reversed(spec['controls']))})
+                          for start, end, spec in reversed(validated)]
         result = []
         for number, (start, end, spec) in enumerate(validated, 1):
             profile = PROFILES[spec["profile"]]

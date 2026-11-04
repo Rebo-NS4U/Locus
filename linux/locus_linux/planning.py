@@ -87,20 +87,43 @@ class RoutePlan:
         self.results = {}
         self.selected = {}
         self.revision = 0
+        self.there_and_back = False
 
     @property
     def points(self):
         return [p["point"] for p in self.pins]
 
+    @property
+    def visits(self):
+        outward = list(range(len(self.pins)))
+        return outward + outward[-2::-1] if self.there_and_back and len(outward) >= 2 else outward
+
+    @property
+    def leg_count(self):
+        return max(0, len(self.visits) - 1)
+
     def key(self, index):
-        return (self.pins[index]["id"], self.pins[index + 1]["id"])
+        visits = self.visits
+        return (self.pins[visits[index]]['id'], self.pins[visits[index + 1]]['id'])
 
     def spec(self, index):
+        outward = len(self.pins) - 1
+        if index >= outward:
+            result = self.spec(2 * outward - 1 - index)
+            result['controls'].reverse()
+            return result
         return copy.deepcopy(self.settings.get(self.key(index), specification()))
+
+    def set_return_trip(self, enabled):
+        if type(enabled) is not bool:
+            raise ValueError('There and back must be on or off')
+        if self.there_and_back != enabled:
+            self.there_and_back = enabled
+            self.change()
 
     def change(self):
         self.revision += 1
-        keys = {self.key(i) for i in range(max(0, len(self.pins) - 1))}
+        keys = {self.key(i) for i in range(self.leg_count)}
         self.settings = {k: v for k, v in self.settings.items() if k in keys}
         self.results = {k: v for k, v in self.results.items() if k in keys}
         self.selected = {k: v for k, v in self.selected.items() if k in keys}
@@ -114,6 +137,7 @@ class RoutePlan:
         self.change()
 
     def reset(self, points):
+        self.there_and_back = False
         self.pins, self.settings, self.results, self.selected = [], {}, {}, {}
         for point in points:
             self.add(point)
@@ -140,7 +164,9 @@ class RoutePlan:
         self.pins[index]["point"] = coordinates(*point)
         for leg in (index - 1, index):
             if 0 <= leg < len(self.pins) - 1:
-                self.results.pop(self.key(leg), None)
+                key = self.key(leg)
+                self.results.pop(key, None)
+                self.results.pop(key[::-1], None)
         self.change()
 
     def remove(self, index):
@@ -158,7 +184,9 @@ class RoutePlan:
             return
         self.settings[key] = validated
         self.results.pop(key, None)
+        self.results.pop(key[::-1], None)
         self.selected.pop(key, None)
+        self.selected.pop(key[::-1], None)
         self.change()
 
     def set_departure(self, index, value):
@@ -173,7 +201,7 @@ class RoutePlan:
     def accept(self, result, revision):
         if revision != self.revision:
             raise ValueError("Route changed while planning. Plan again to use your edits.")
-        if len(result) != len(self.pins) - 1:
+        if len(result) != self.leg_count:
             raise ValueError("Planner returned an incomplete route")
         for i, options in enumerate(result):
             if not options:
@@ -189,19 +217,21 @@ class RoutePlan:
 
     def segments(self):
         result = []
-        for i in range(len(self.pins) - 1):
+        for i in range(self.leg_count):
+            origin, destination = self.visits[i:i + 2]
             spec = self.spec(i)
             profile = PROFILES[spec["profile"]]
             options = self.results.get(self.key(i), [])
             choice = options[self.selected.get(self.key(i), 0)] if options else None
-            points = choice["points"] if choice else [self.points[i], *spec["controls"], self.points[i + 1]]
+            points = choice["points"] if choice else [self.points[origin], *spec["controls"], self.points[destination]]
             stops = [{"point": points[stop['index']], "kind": stop['kind']} for stop in choice.get('stops', [])] if choice else []
-            result.append({"points": points, "controls": spec["controls"], "color": profile["color"], "label": profile["label"], "ready": bool(options), "connectors": choice.get("connectors", []) if choice else [], "stops": stops})
+            result.append({"from_stop": origin + 1, "to_stop": destination + 1, "points": points, "controls": spec["controls"], "color": profile["color"], "label": profile["label"], "ready": bool(options), "connectors": choice.get("connectors", []) if choice else [], "stops": stops})
         return result
 
     def assemble(self):
         points, speeds, sources, driving, motorized, stops, planned_stops = [], [], [], [], [], [], []
-        for i in range(len(self.pins) - 1):
+        for i in range(self.leg_count):
+            destination = self.visits[i + 1]
             key = self.key(i)
             if not self.results.get(key):
                 raise ValueError(f"Plan segment {i + 1} before starting")
@@ -216,9 +246,9 @@ class RoutePlan:
                 if rule['mode'] != 'none':
                     planned_stops.append({'index': 0, 'stop': 1, **rule})
             points.extend(shape if not points else shape[1:])
-            rule = departure(self.pins[i + 1].get('departure'))
+            rule = departure(self.pins[destination].get('departure'))
             if rule['mode'] != 'none':
-                planned_stops.append({'index': len(points) - 1, 'stop': i + 2, **rule})
+                planned_stops.append({'index': len(points) - 1, 'stop': destination + 1, **rule})
             speeds.extend(option["speeds"])
             sources.extend(option["sources"])
             driving.extend(option["driving"])
@@ -229,7 +259,7 @@ class RoutePlan:
         return {"points": points, "speeds": speeds, "sources": sources, "driving": driving, "motorized": motorized, "stops": stops, "planned_stops": planned_stops}
 
     def serialize(self):
-        return {"format": "locus-route", "version": 1, "pins": copy.deepcopy(self.pins), "legs": [self.spec(i) for i in range(len(self.pins) - 1)]}
+        return {"format": "locus-route", "version": 1, "there_and_back": self.there_and_back, "pins": copy.deepcopy(self.pins), "legs": [self.spec(i) for i in range(len(self.pins) - 1)]}
 
     @classmethod
     def deserialize(cls, value):
@@ -244,4 +274,5 @@ class RoutePlan:
             plan.set_departure(len(plan.pins) - 1, pin.get("departure"))
         for i, spec in enumerate(legs):
             plan.update(i, spec)
+        plan.set_return_trip(value.get('there_and_back', False))
         return plan

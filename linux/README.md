@@ -89,6 +89,12 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   off-road sections. GPX import accepts
   one track segment or route at a time and rejects separated segments rather
   than drawing unexplained connecting lines.
+- **There and back** plans a return through the same stops in reverse order with
+  the same per-leg travel modes. Driving return legs are routed independently for
+  one-way roads and garage access. Planned stops repeat on return visits; the
+  turnaround stop is visited once. The option saves with routes and drafts.
+  Imported GPX tracks retrace their exact geometry. **Loop route** repeats the
+  complete trip; with There and back enabled, each loop ends where it started.
 - Route start, pause, resume, hold, looping, distance progress and a moving marker
   that shows the last acknowledged command alongside numbered route pins.
 - USB pairing/preparation and rootless USB or trusted Wi-Fi iPhone transport.

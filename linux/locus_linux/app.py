@@ -202,6 +202,7 @@ class Window(QMainWindow):
         self.auto_plan_timer.setInterval(600)
         self.auto_plan_timer.timeout.connect(self.refresh_automatic_route)
         self.imported_track = False
+        self.source_track_points = []
         self.motion = {"mode": "fixed", "connected": False}
         self.keys = set()
         self.joystick_engaged = False
@@ -628,9 +629,15 @@ class Window(QMainWindow):
         self.route_summary.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.route_summary.setFixedHeight(22)
         footer.addWidget(self.route_summary)
+        trip_options = QHBoxLayout()
+        self.there_and_back = QCheckBox('There and back')
+        self.there_and_back.setToolTip('Return through the same stops in reverse order. Return roads are planned separately.')
+        self.there_and_back.toggled.connect(self.change_return_trip)
+        trip_options.addWidget(self.there_and_back)
         self.loop_route = QCheckBox("Loop route")
         self.loop_route.setToolTip("Restart at the first point after reaching the last stop")
-        footer.addWidget(self.loop_route)
+        trip_options.addWidget(self.loop_route)
+        footer.addLayout(trip_options)
         row = QHBoxLayout()
         self.button("Start", self.start_route, row, True).setObjectName("primary")
         self.button("Pause", lambda: self.request("control", "pause"), row, True)
@@ -1097,6 +1104,10 @@ class Window(QMainWindow):
         self.stops = self.route_plan.points
         self.plan_button.setEnabled(len(self.stops) >= 2)
         self.imported_track = False
+        self.source_track_points = []
+        self.there_and_back.blockSignals(True)
+        self.there_and_back.setChecked(self.route_plan.there_and_back)
+        self.there_and_back.blockSignals(False)
         if select_newest:
             selected_row = max(0, 2 * len(self.stops) - 3)
         self.route_list.blockSignals(True)
@@ -1212,6 +1223,8 @@ class Window(QMainWindow):
             self.select_segment(index)
 
     def select_map_segment(self, index):
+        if index >= len(self.stops) - 1 and self.route_plan.there_and_back:
+            index = 2 * (len(self.stops) - 1) - 1 - index
         if 0 <= index < len(self.stops) - 1:
             self.sidebar_toggle.setChecked(True)
             self.tabs.setCurrentIndex(1)
@@ -1223,7 +1236,7 @@ class Window(QMainWindow):
             combined = self.route_plan.assemble()
             self.route_points = combined.pop("points")
             self.route_profile = combined
-            self.show_route_summary("Mixed route")
+            self.show_route_summary("There and back" if self.route_plan.there_and_back else "Mixed route")
         except ValueError:
             self.route_summary.setText(f"{len(self.stops)} stops · ready to plan" if len(self.stops) >= 2 else "Add at least two stops to build a route.")
             self.redraw_route()
@@ -1246,7 +1259,7 @@ class Window(QMainWindow):
 
     def schedule_automatic_route(self):
         if not self.imported_track and len(self.stops) >= 2 and any(
-                not self.route_plan.results.get(self.route_plan.key(i)) for i in range(len(self.stops) - 1)):
+                not self.route_plan.results.get(self.route_plan.key(i)) for i in range(self.route_plan.leg_count)):
             self.auto_plan_timer.start()
         else:
             self.auto_plan_timer.stop()
@@ -1265,7 +1278,7 @@ class Window(QMainWindow):
         if not self.busy and self.editable_route():
             self.planning_revision = self.route_plan.revision
             self.planning_document = self.route_plan
-            self.request("mixed_route", self.route_plan.requests(), self.store.data["settings"].get("valhalla", VALHALLA), self.store.data['settings'].get('overpass', OVERPASS), self.traffic_stops.isChecked())
+            self.request("mixed_route", self.route_plan.requests(), self.store.data["settings"].get("valhalla", VALHALLA), self.store.data['settings'].get('overpass', OVERPASS), self.traffic_stops.isChecked(), self.route_plan.there_and_back)
 
     def choose_route(self, index):
         if 0 <= index < len(self.alternatives) and self.editable_route():
@@ -1274,6 +1287,36 @@ class Window(QMainWindow):
                 self.route_plan.select(segment, index)
                 self.rebuild_route()
                 self.select_segment(segment)
+
+    def refresh_imported_trip(self):
+        points = self.source_track_points
+        self.route_points = points + points[-2::-1] if self.route_plan.there_and_back else points.copy()
+        Route(self.route_points)
+        self.route_profile = None
+        self.show_route_summary('There and back · GPX' if self.route_plan.there_and_back else 'Imported GPX')
+
+    def change_return_trip(self, enabled):
+        previous = self.route_plan.there_and_back
+        if not self.editable_route():
+            self.there_and_back.blockSignals(True)
+            self.there_and_back.setChecked(previous)
+            self.there_and_back.blockSignals(False)
+            return
+        try:
+            self.route_plan.set_return_trip(enabled)
+            if self.imported_track:
+                self.refresh_imported_trip()
+                self.remember_route_draft()
+            else:
+                self.stops_changed()
+        except ValueError as error:
+            self.route_plan.set_return_trip(previous)
+            self.there_and_back.blockSignals(True)
+            self.there_and_back.setChecked(previous)
+            self.there_and_back.blockSignals(False)
+            if self.imported_track:
+                self.refresh_imported_trip()
+            self.status.setText(str(error))
 
     def start_route(self):
         if len(self.route_points) < 2:
@@ -1284,7 +1327,7 @@ class Window(QMainWindow):
 
     def current_route_document(self):
         if self.imported_track:
-            return {'format': 'locus-track', 'version': 1, 'points': self.route_points.copy()}
+            return {'format': 'locus-track', 'version': 1, 'points': self.source_track_points.copy(), 'there_and_back': self.route_plan.there_and_back}
         return self.route_plan.serialize()
 
     def remember_route_draft(self):
@@ -1337,15 +1380,17 @@ class Window(QMainWindow):
             if value['format'] == 'locus-track':
                 points = Route(value['points']).points
                 self.route_plan.reset([points[0], points[-1]])
+                self.route_plan.set_return_trip(value.get('there_and_back', False))
                 self.stops_changed()
-                self.route_points, self.route_profile, self.imported_track = points, None, True
+                self.source_track_points, self.imported_track = points, True
+                self.refresh_imported_trip()
                 self.select_departure()
-                self.show_route_summary('Saved track')
             else:
                 plan = RoutePlan.deserialize(value) if len(value['pins']) >= 2 else RoutePlan()
                 if len(value['pins']) == 1:
                     plan.add(value['pins'][0]['point'])
                     plan.set_departure(0, value['pins'][0].get('departure'))
+                plan.set_return_trip(value.get('there_and_back', False))
                 for index in range(len(plan.pins) - 1):
                     plan.update(index, automatic_specification(plan.spec(index)))
                 self.route_plan = plan
@@ -1456,9 +1501,9 @@ class Window(QMainWindow):
                 self.route_title.setText(Path(path).stem)
                 self.route_plan.reset([points[0], points[-1]])
                 self.stops_changed()
-                self.route_points = points
-                self.route_profile = None
+                self.source_track_points = points
                 self.imported_track = True
+                self.refresh_imported_trip()
                 self.select_departure()
                 self.remember_route_draft()
                 self.show_route_summary("Imported GPX")

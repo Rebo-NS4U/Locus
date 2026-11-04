@@ -10,8 +10,12 @@ from .routes import Route
 
 def document(value):
     value = copy.deepcopy(value)
+    if type(value.get('there_and_back', False)) is not bool:
+        raise ValueError('There and back must be on or off')
     if value.get('format') == 'locus-track' and value.get('version') == 1:
-        return {'format': 'locus-track', 'version': 1, 'points': Route(value['points']).points}
+        if value.get('there_and_back'):
+            Route(value['points'] + value['points'][-2::-1])
+        return {'format': 'locus-track', 'version': 1, 'points': Route(value['points']).points, 'there_and_back': value.get('there_and_back', False)}
     if value.get('format') != 'locus-route' or value.get('version') != 1:
         raise ValueError('Unsupported saved route')
     if len(value.get('pins', [])) >= 2:
@@ -22,6 +26,7 @@ def document(value):
     for pin in value.get('pins', []):
         plan.add(coordinates(*pin['point']))
         plan.set_departure(len(plan.pins) - 1, pin.get('departure'))
+    plan.set_return_trip(value.get('there_and_back', False))
     return plan.serialize()
 
 
