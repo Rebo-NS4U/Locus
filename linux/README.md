@@ -43,8 +43,9 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   pins connect to that geometry without replacing the entire walking leg with a
   straight shortcut. Map coverage determines the available mapped paths. GPX supports exact geometry.
 - Walking stops inside the same mapped building can connect indoors automatically
-  without snapping out to sidewalks. Connections stay within a simple building
-  outline and cover up to 300 metres (984 ft). This approximates indoor movement;
+  without snapping out to sidewalks. Entry/exit connections also work when one
+  stop is indoors and the other is within 40 metres (131 ft) of the footprint along
+  the connection. Indoor connections cover up to 300 metres (984 ft). This approximates indoor movement;
   room walls, corridors and floor changes are not modeled. Missing footprints or
   connections crossing outside a concave outline keep normal outdoor routing.
 - Automatic driving speed from mapped road speeds/limits and surface information,

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import AsyncMock
 
-from locus_linux.indoor import inside_connection
+from locus_linux.indoor import inside_connection, building_access
 from locus_linux.services import Services
 
 
@@ -17,6 +17,16 @@ class FootprintTests(unittest.TestCase):
         ring = [(0, 0), (0, 4), (1, 4), (1, 1), (4, 1), (4, 0), (0, 0)]
         self.assertFalse(inside_connection((.5, 3), (3, .5), ring))
         self.assertTrue(inside_connection((.5, 3), (.5, .5), ring))
+    def test_building_access_requires_indoor_end_and_short_outdoor_approach(self):
+        ring = [(0, 0), (0, .002), (.002, .002), (.002, 0), (0, 0)]
+        self.assertTrue(building_access((.001, .001), (.0021, .001), ring))
+        self.assertFalse(building_access((.001, .001), (.003, .001), ring))
+        self.assertFalse(building_access((-.0001, .001), (.0021, .001), ring))
+
+    def test_building_access_cannot_jump_across_concave_exterior_gap(self):
+        ring = [(0, 0), (0, .004), (.001, .004), (.001, .001), (.004, .001), (.004, 0), (0, 0)]
+        self.assertFalse(building_access((.0005, .003), (.003, .0005), ring))
+
 
 
 class IndoorServiceTests(unittest.IsolatedAsyncioTestCase):
@@ -42,6 +52,18 @@ class IndoorServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(any(option['motorized']))
         self.assertIn('Approximate indoor', option['speed_warning'])
         service.route.assert_not_awaited()
+
+    async def test_walking_can_enter_and_leave_a_building_without_sidewalk_detour(self):
+        for start, end in (((.001, .001), (.0021, .001)),
+                           ((.0021, .001), (.001, .001))):
+            service = self.service()
+            service.route = AsyncMock(side_effect=AssertionError('Must use building access'))
+            option = (await service.mixed_route([{'start': start, 'end': end,
+                        'spec': {'profile': 'walk_auto'}}]))[0][0]
+            self.assertEqual(option['points'], [start, end])
+            self.assertEqual(option['connectors'], [])
+            self.assertIn('building entry/exit', option['speed_warning'])
+            service.route.assert_not_awaited()
 
     async def test_default_osm_read_resolves_way_nodes(self):
         service = self.service()

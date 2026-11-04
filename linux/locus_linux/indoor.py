@@ -15,10 +15,8 @@ def contains(point, ring):
     return inside
 
 
-def inside_connection(start, end, ring):
-    """Check every interval between boundary crossings, including concave outlines."""
-    if len(ring) < 4 or ring[0] != ring[-1] or not all(contains(p, ring) for p in (start, end)):
-        return False
+def intervals(start, end, ring):
+    """Partition a straight connection at every building boundary crossing."""
     dx, dy = end[0] - start[0], end[1] - start[1]
     cuts = [0., 1.]
     for a, b in zip(ring, ring[1:]):
@@ -32,5 +30,31 @@ def inside_connection(start, end, ring):
         if 0 <= t <= 1 and 0 <= u <= 1:
             cuts.append(t)
     cuts = sorted(set(cuts))
-    return all(contains((start[0] + dx * ((a + b) / 2), start[1] + dy * ((a + b) / 2)), ring)
-               for a, b in zip(cuts, cuts[1:]))
+    return [(a, b, contains((start[0] + dx * ((a + b) / 2), start[1] + dy * ((a + b) / 2)), ring))
+            for a, b in zip(cuts, cuts[1:]) if b - a > 1e-10]
+
+
+def inside_connection(start, end, ring):
+    """Check every interval, including concave outlines."""
+    if len(ring) < 4 or ring[0] != ring[-1] or not all(contains(p, ring) for p in (start, end)):
+        return False
+    return all(inside for _, _, inside in intervals(start, end, ring))
+
+
+def building_access(start, end, ring, max_access_metres=40):
+    """Allow a short approach at one end of an otherwise indoor connection."""
+    from .routes import distance
+    if len(ring) < 4 or ring[0] != ring[-1]:
+        return False
+    # Outdoor-to-outdoor legs keep normal path routing.
+    if not any(contains(p, ring) for p in (start, end)):
+        return False
+    pieces = intervals(start, end, ring)
+    indoor = [i for i, (_, _, inside) in enumerate(pieces) if inside]
+    if not indoor:
+        return False
+    first, last = min(indoor), max(indoor)
+    if any(not inside for _, _, inside in pieces[first:last + 1]):
+        return False  # Do not cross an exterior gap in a concave outline.
+    length = distance(start, end)
+    return pieces[first][0] * length <= max_access_metres and (1 - pieces[last][1]) * length <= max_access_metres
