@@ -33,6 +33,9 @@ class Session:
         self.vector = (0.0, 0.0)
         self.speed = 1.4
         self.variation = False
+        self.variation_factor = 1.0
+        self.variation_target = 1.0
+        self.variation_remaining = 0.0
         self.reconnect = True
         self.last_target = None
         self.last_ack = None
@@ -53,7 +56,8 @@ class Session:
                 "speed_kph": self.motion_speed * 3.6,
                 "speed_source": self.route.sources[self.route.edge_at(self.progress)] if self.route and self.route.sources and self.mode == "route" else "manual / global",
                 "planned_stop": self.departures.snapshot() if self.mode == "route" and self.departures else None,
-                "traffic_stop": {"kind": self.traffic.waiting['kind'], "remaining": self.traffic.remaining} if self.mode == 'route' and self.traffic and self.traffic.waiting else None}
+                "active_leg": self.route.leg_at(self.progress, bool(self.departures and self.departures.waiting)) if self.route and self.mode == "route" else None,
+                "traffic_stop": {"kind": self.traffic.waiting['kind'], "remaining": self.traffic.remaining, "queue_distance": self.traffic.waiting.get("queue_distance", 0)} if self.mode == 'route' and self.traffic and self.traffic.waiting else None}
 
     async def configure_traffic(self, enabled, red_probability=.45):
         from .traffic import TrafficSchedule
@@ -65,7 +69,7 @@ class Session:
             previous = self.traffic
             self.traffic_enabled, self.red_probability = enabled, red_probability
             if self.route and self.mode == 'route':
-                self.traffic = TrafficSchedule(self.route.stops, enabled, red_probability, self.traffic_rng, after=self.progress + .01)
+                self.traffic = TrafficSchedule(self.route.stops, enabled, red_probability, self.traffic_rng, after=max(self.progress + .01, previous.served_through if previous else -1))
                 if enabled and previous and previous.waiting:
                     self.traffic.waiting, self.traffic.remaining = previous.waiting, previous.remaining
             self.changed(self.snapshot())
@@ -85,7 +89,8 @@ class Session:
         async with self.lock:
             self.route, self.progress, self.loop_route = route, 0, bool(loop)
             self.mode, self.paused = "route", False
-            self.motion_speed = 0 if not route.speeds or (route.driving and route.driving[0]) else route.speeds[0]
+            self.motion_speed = 0 if not route.speeds or route.motorized[0] or self.variation else route.speeds[0]
+            self.variation_factor, self.variation_target, self.variation_remaining = 1., 1., 0.
             from .traffic import TrafficSchedule
             self.traffic = TrafficSchedule(route.stops, self.traffic_enabled, self.red_probability, self.traffic_rng)
             from .departures import DepartureSchedule
@@ -194,6 +199,41 @@ class Session:
             elapsed, self.last_tick = now - self.last_tick, now
             await self.tick(elapsed, now)
 
+    def smooth_variation(self, duration, limited):
+        if not self.variation:
+            return 1.
+        self.variation_remaining -= duration
+        if self.variation_remaining <= 0:
+            self.variation_target = random.uniform(.9, 1. if limited else 1.1)
+            self.variation_remaining = random.uniform(6, 16)
+        self.variation_factor += (self.variation_target - self.variation_factor) * min(1., duration / 4)
+        return min(1., self.variation_factor) if limited else self.variation_factor
+
+    def advance_smoothly(self, duration, factor, stop_at):
+        remaining = duration
+        while remaining > 1e-8 and self.progress < stop_at - 1e-8:
+            step = min(.1, remaining)
+            edge = self.route.edge_at(self.progress)
+            vehicle = self.route.motorized[edge]
+            variation = min(factor, 1.) if vehicle else factor
+            target = (self.route.desired_speed(self.progress) if self.route.speeds else self.speed) * variation
+            acceleration, braking = (2., 3.) if vehicle else (.8, 1.2)
+            target = min(target, math.sqrt(2 * braking * max(0, stop_at - self.progress)))
+            next_speed = min(target, self.motion_speed + acceleration * step) if target >= self.motion_speed else max(target, self.motion_speed - braking * step)
+            average = max(.001, (self.motion_speed + next_speed) / 2)
+            if self.route.speeds:
+                self.progress = min(stop_at, self.route.advance(self.progress, step, average, variation))
+            else:
+                self.progress = min(stop_at, self.progress + average * step)
+            self.motion_speed = next_speed
+            if self.route.speeds:
+                edge = self.route.edge_at(self.progress)
+                limit_factor = min(factor, 1.) if self.route.motorized[edge] else factor
+                self.motion_speed = min(self.motion_speed, self.route.speeds[edge] * limit_factor)
+            remaining -= step
+        if 0 <= stop_at - self.progress <= 1e-8:
+            self.progress = stop_at
+
     async def tick(self, elapsed, now=None):
         from .routes import offset
         now = time.monotonic() if now is None else now
@@ -234,21 +274,12 @@ class Session:
                     elif waiting:
                         self.traffic.hold(duration)
                         self.motion_speed = 0
-                    elif self.route.speeds:
-                        edge = self.route.edge_at(self.progress)
-                        automatic = (self.route.driving and self.route.driving[edge]) or (self.traffic_enabled and self.route.stops and self.route.motorized[edge])
-                        factor = random.uniform(.9, 1 if automatic else 1.1) if self.variation else 1
-                        desired = self.route.desired_speed(self.progress) * factor
-                        if planned_next:
-                            desired = min(desired, math.sqrt(2 * 3 * max(0, planned_next['distance'] - self.progress)))
-                        if upcoming:
-                            desired = min(desired, math.sqrt(2 * 3 * max(0, upcoming['distance'] - self.progress)))
-                        if automatic:
-                            cap = min(desired, self.motion_speed + 2 * duration) if desired >= self.motion_speed else max(desired, self.motion_speed - 3 * duration)
-                        else:
-                            cap = desired
-                        self.progress = self.route.advance(self.progress, duration, max(.1, cap), factor)
-                        self.motion_speed = (self.progress - previous) / duration if duration else 0
+                    elif self.route.speeds or self.variation:
+                        vehicle = self.route.motorized[self.route.edge_at(self.progress)]
+                        factor = self.smooth_variation(duration, vehicle)
+                        stop_at = min(self.route.total, planned_next['distance'] if planned_next else self.route.total,
+                                      upcoming['distance'] if upcoming else self.route.total)
+                        self.advance_smoothly(duration, factor, stop_at)
                     else:
                         self.progress = min(self.route.total, self.progress + meters)
                         self.motion_speed = speed

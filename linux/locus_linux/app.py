@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, QUrl, Signal, Slot, Qt, QLockFile, QTimer, QTime, QEvent
-from PySide6.QtGui import QIcon, QKeySequence, QShortcut
+from PySide6.QtGui import QIcon, QKeySequence, QShortcut, QColor, QBrush
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QListWidgetItem, QComboBox, QDoubleSpinBox, QMessageBox, QLineEdit, QListWidget,
     QTabWidget, QGroupBox, QCheckBox, QSplitter, QFileDialog, QInputDialog,
@@ -204,6 +204,7 @@ class Window(QMainWindow):
         self.imported_track = False
         self.source_track_points = []
         self.motion = {"mode": "fixed", "connected": False}
+        self.active_leg_signature = None
         self.keys = set()
         self.joystick_engaged = False
         self.pending_recent = None
@@ -215,7 +216,7 @@ class Window(QMainWindow):
         preferences = self.store.data["settings"]
         self.travel_mode.setCurrentText(preferences.get("travel_mode", "Walk"))
         self.speed.setValue(to_mph(preferences.get("speed_kph", to_kph(self.speed.value()))))
-        self.variation.setChecked(preferences.get("variation", False))
+        self.variation.setChecked(preferences.get("variation", True) if preferences.get("motion_revision") == 1 else True)
         self.map_style.setCurrentIndex(0 if preferences.get("night_map", True) else 1)
         self.follow.setChecked(preferences.get("follow", True))
         self.sidebar_toggle.setChecked(preferences.get("sidebar_visible", False))
@@ -645,6 +646,11 @@ class Window(QMainWindow):
         footer.addLayout(row)
         self.continue_stop = self.button('Continue from stop', lambda: self.request('control', 'depart'), footer, True)
         self.continue_stop.setVisible(False)
+        self.active_leg_label = QLabel('')
+        self.active_leg_label.setObjectName('subtitle')
+        self.active_leg_label.setWordWrap(True)
+        self.active_leg_label.hide()
+        footer.addWidget(self.active_leg_label)
         self.progress = StatusLabel("Not following a route")
         self.progress.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.progress.setFixedHeight(self.progress.fontMetrics().lineSpacing() * 3 + 4)
@@ -671,9 +677,9 @@ class Window(QMainWindow):
         self.variation.toggled.connect(self.configure_motion)
         group.addWidget(self.variation)
         group = self.group("Driving stops", box)
-        self.traffic_stops = QCheckBox("Auto stops at mapped signs and lights")
+        self.traffic_stops = QCheckBox("Auto stops at signs, lights and crosswalks")
         self.traffic_stops.setChecked(self.store.data['settings'].get('traffic_stops', True))
-        self.traffic_stops.setToolTip('Stop signs pause for 2–5 seconds. Simulated red lights wait 8–65 seconds. Replan to fetch traffic controls; signal phases are not live.')
+        self.traffic_stops.setToolTip('Stop signs: 2–5 seconds. Crosswalks: 30% chance of a 2–8 second yield. Red lights: 8–65 seconds with a randomized 10–66 ft queue when space permits. These are simulated, not live conditions.')
         self.traffic_stops.toggled.connect(self.configure_motion)
         group.addWidget(self.traffic_stops)
         self.red_probability = QDoubleSpinBox()
@@ -863,6 +869,7 @@ class Window(QMainWindow):
 
     def motion_changed(self, state):
         self.motion = state
+        self.highlight_active_leg(state.get("active_leg"))
         self.connection_badge.setText(("Demo session" if self.demo else "Location active") if state["connected"] else "Location unknown / inactive")
         self.connection_badge.setStyleSheet(f"color: {self.colors['accent'] if state['connected'] else self.colors['muted']};")
         self.js("setAcknowledged", state["position"], state["connected"])
@@ -881,9 +888,35 @@ class Window(QMainWindow):
             self.progress.setText(label)
         if state.get('traffic_stop'):
             stop = state['traffic_stop']
-            label = 'Stop sign' if stop['kind'] == 'stop_sign' else 'Simulated red light'
+            label = 'Stop sign' if stop['kind'] == 'stop_sign' else 'Crosswalk yield' if stop['kind'] == 'crosswalk' else f"Red light · queue {stop.get('queue_distance', 0) * 3.28084:.0f} ft back"
             self.connection_badge.setText(f"{label} · {stop['remaining']:.0f}s")
             self.progress.setText(self.progress.text() + f"\n{label}: {stop['remaining']:.1f}s remaining")
+
+    def highlight_active_leg(self, leg, force=False):
+        signature = (leg['index'], leg['from_stop'], leg['to_stop']) if leg else None
+        if signature == self.active_leg_signature and not force:
+            return
+        self.active_leg_signature = signature
+        self.js('setActiveLeg', leg)
+        self.active_leg_label.setVisible(bool(leg))
+        if leg:
+            self.active_leg_label.setText(f"Active: stop {leg['from_stop']} → {leg['to_stop']} · {leg.get('mode', '')}")
+        rows = set()
+        if leg:
+            index = leg['index']
+            outward = len(self.stops) - 1
+            if index >= outward:
+                index = 2 * outward - 1 - index
+            rows = {2 * (leg['from_stop'] - 1), 2 * (leg['to_stop'] - 1), 2 * index + 1}
+        color = QColor(self.colors['accent'])
+        color.setAlpha(70)
+        for row in range(self.route_list.count()):
+            item = self.route_list.item(row)
+            active = row in rows
+            item.setBackground(QBrush(color) if active else QBrush())
+            font = item.font()
+            font.setBold(active)
+            item.setFont(font)
 
     def configure_motion(self, *unused):
         if self.ready:
@@ -1124,6 +1157,7 @@ class Window(QMainWindow):
             self.route_list.setCurrentRow(min(selected_row, self.route_list.count() - 1))
         self.route_list.blockSignals(False)
         self.select_segment(self.selected_segment())
+        self.highlight_active_leg(self.motion.get("active_leg"), force=True)
         self.rebuild_route()
         self.remember_route_draft()
         self.schedule_automatic_route()
@@ -1159,7 +1193,8 @@ class Window(QMainWindow):
                 text += speed_text(option.get("speed_warning", option["sources"][0]))
                 signs = sum(stop['kind'] == 'stop_sign' for stop in option.get('stops', []))
                 lights = sum(stop['kind'] == 'traffic_light' for stop in option.get('stops', []))
-                text += f'\n{signs} stop signs · {lights} traffic lights'
+                crossings = sum(stop['kind'] == 'crosswalk' for stop in option.get('stops', []))
+                text += f'\n{signs} signs · {lights} lights · {crossings} crosswalks'
                 if option.get('garage_warning'):
                     text += '\n' + option['garage_warning']
                 if option.get('traffic_warning'):
@@ -1242,7 +1277,12 @@ class Window(QMainWindow):
             self.redraw_route()
 
     def redraw_route(self):
-        self.js("setRoute", self.route_points, self.stops, [] if self.imported_track else self.route_plan.segments(), self.selected_segment())
+        if self.imported_track and self.route_profile:
+            pieces = [{'points': self.route_points[leg['first']:leg['last'] + 1], 'ready': True,
+                       'color': self.colors['accent'], 'label': 'GPX', **leg} for leg in self.route_profile.get('legs', [])]
+        else:
+            pieces = self.route_plan.segments()
+        self.js('setRoute', self.route_points, self.stops, pieces, self.selected_segment())
 
     def use_drawn_route(self):
         if self.editable_route():
@@ -1292,7 +1332,11 @@ class Window(QMainWindow):
         points = self.source_track_points
         self.route_points = points + points[-2::-1] if self.route_plan.there_and_back else points.copy()
         Route(self.route_points)
-        self.route_profile = None
+        count = len(points)
+        legs = [{'first': 0, 'last': count - 1, 'from_stop': 1, 'to_stop': 2, 'mode': 'GPX'}]
+        if self.route_plan.there_and_back:
+            legs.append({'first': count - 1, 'last': len(self.route_points) - 1, 'from_stop': 2, 'to_stop': 1, 'mode': 'GPX'})
+        self.route_profile = {'legs': legs}
         self.show_route_summary('There and back · GPX' if self.route_plan.there_and_back else 'Imported GPX')
 
     def change_return_trip(self, enabled):
@@ -1525,7 +1569,7 @@ class Window(QMainWindow):
         try:
             self.store.data["settings"].update(photon=endpoint(self.photon.text().strip()), valhalla=endpoint(self.valhalla.text().strip()),
                 reconnect=self.reconnect.isChecked(), notifications=self.notifications.isChecked(), travel_mode=self.travel_mode.currentText(),
-                speed_kph=to_kph(self.speed.value()), variation=self.variation.isChecked(), night_map=self.map_style.currentIndex() == 0, follow=self.follow.isChecked(),
+                motion_revision=1, speed_kph=to_kph(self.speed.value()), variation=self.variation.isChecked(), night_map=self.map_style.currentIndex() == 0, follow=self.follow.isChecked(),
                 traffic_stops=self.traffic_stops.isChecked(), red_probability=self.red_probability.value(), overpass=endpoint(self.overpass.text().strip()))
             self.store.save()
             self.configure_motion()

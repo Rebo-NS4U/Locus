@@ -91,6 +91,8 @@ class Services:
         self.lock = asyncio.Lock()
         self.last_request = 0
         self.map_objects = {}
+        self.plan_cache = {}
+        self.plan_cache_points = 0
 
     async def get(self, url, params):
         endpoint(url)
@@ -186,7 +188,7 @@ class Services:
         bbox = f'{south},{west},{north},{east}'
         query = f'[out:json][timeout:12];way[building][building!=no]({bbox});out geom;'
         try:
-            response = await self.get(f'{OSM_READ}/map.json', {'bbox': f'{west},{south},{east},{north}'}) if url == OVERPASS else await self.get(url, {'data': query})
+            response = await self.get(f'{OSM_READ}/map.json', {'bbox': f'{west:.6f},{south:.6f},{east:.6f},{north:.6f}'}) if url == OVERPASS else await self.get(url, {'data': query})
             nodes = {p['id']: p for p in response.get('elements', []) if p.get('type') == 'node'}
             for element in response.get('elements', []):
                 if element.get('type') != 'way' or element.get('tags', {}).get('building') in (None, 'no'):
@@ -214,7 +216,7 @@ class Services:
             return None
         south, west = math.floor(lat * 500) / 500 - .002, math.floor(lon * 500) / 500 - .002
         try:
-            response = await self.get(f'{OSM_READ}/map.json', {'bbox': f'{west},{south},{west + .006},{south + .006}'})
+            response = await self.get(f'{OSM_READ}/map.json', {'bbox': f'{west:.6f},{south:.6f},{west + .006:.6f},{south + .006:.6f}'})
             return garage_access(response.get('elements', []), point, departing, target)
         except GarageExitUnavailable:
             raise
@@ -268,6 +270,13 @@ class Services:
                           for start, end, spec in reversed(validated)]
         result = []
         for number, (start, end, spec) in enumerate(validated, 1):
+            cache_key = json.dumps([start, end, spec, url, overpass_url, include_stops], sort_keys=True)
+            cached = self.plan_cache.get(cache_key)
+            if cached and time.monotonic() - cached[0] < 300:
+                result.append(copy.deepcopy(cached[1]))
+                continue
+            if cached:
+                self.plan_cache_points -= self.plan_cache.pop(cache_key)[2]
             profile = PROFILES[spec["profile"]]
             waypoints = [start, *spec["controls"], end]
             prefix = suffix = garage_path = None
@@ -325,6 +334,14 @@ class Services:
                     # Provider preference costs can rank a longer sidewalk detour
                     # first. Compare full walking distance, including pin access.
                     options.sort(key=lambda option: option["distance"])
+                point_count = sum(len(option['points']) for option in options)
+                if point_count <= 200000:
+                    if cache_key in self.plan_cache:
+                        self.plan_cache_points -= self.plan_cache.pop(cache_key)[2]
+                    while self.plan_cache and (len(self.plan_cache) >= 256 or self.plan_cache_points + point_count > 200000):
+                        self.plan_cache_points -= self.plan_cache.pop(next(iter(self.plan_cache)))[2]
+                    self.plan_cache[cache_key] = time.monotonic(), copy.deepcopy(options), point_count
+                    self.plan_cache_points += point_count
                 result.append(options)
             except Exception as error:
                 raise ValueError(f"Segment {number}: {error}") from error
@@ -401,7 +418,7 @@ class Services:
             else:
                 for start in range(0, len(ways), 60):
                     ids = ','.join(map(str, ways[start:start + 60]))
-                    query = f'[out:json][timeout:12];way(id:{ids})->.roads;(.roads;node(w.roads)[highway=stop];node(w.roads)[highway=traffic_signals];);out body;'
+                    query = f'[out:json][timeout:12];way(id:{ids})->.roads;(.roads;node(w.roads)[highway=stop];node(w.roads)[highway=traffic_signals];node(w.roads)[highway=crossing];);out body;'
                     response = await self.get(url, {'data': query})
                     if response.get('remark') or not isinstance(response.get('elements'), list):
                         raise ValueError('Incomplete traffic control response')

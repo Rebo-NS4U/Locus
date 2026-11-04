@@ -56,6 +56,7 @@ collapsed_width = None
 errors = []
 gesture_results = []
 traffic_future = None
+active_map_check = []
 window.worker.failed.connect(lambda operation, error: errors.append((operation, error)))
 
 
@@ -337,6 +338,13 @@ def check():
             assert result['traffic_stop']['kind'] == 'traffic_light'
             assert result['speed_kph'] == 0
             assert 'red light' in window.connection_badge.text().lower()
+            assert result['active_leg']['from_stop'] == 1
+            assert 'stop 1 → 2' in window.active_leg_label.text()
+            assert all(window.route_list.item(row).font().bold() for row in (0, 1, 2))
+            window.map.page().runJavaScript("Boolean(activeLeg && activeLeg.index === 0 && legLines[0].options.weight === 8 && document.querySelectorAll('.route-stop-active').length === 2)", active_map_check.append)
+            stage = 71
+        elif stage == 71 and active_map_check:
+            assert active_map_check == [True], active_map_check
             window.grab().save('/tmp/locus-linux-traffic-stop.png')
             window.request('control', 'pause')
             stage = 8

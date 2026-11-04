@@ -229,7 +229,7 @@ class RoutePlan:
         return result
 
     def assemble(self):
-        points, speeds, sources, driving, motorized, stops, planned_stops = [], [], [], [], [], [], []
+        points, speeds, sources, driving, motorized, stops, planned_stops, legs = [], [], [], [], [], [], [], []
         for i in range(self.leg_count):
             destination = self.visits[i + 1]
             key = self.key(i)
@@ -249,14 +249,16 @@ class RoutePlan:
             rule = departure(self.pins[destination].get('departure'))
             if rule['mode'] != 'none':
                 planned_stops.append({'index': len(points) - 1, 'stop': destination + 1, **rule})
+            legs.append({'first': offset, 'last': len(points) - 1, 'from_stop': self.visits[i] + 1,
+                         'to_stop': destination + 1, 'mode': travel_mode(self.spec(i)['profile'])})
             speeds.extend(option["speeds"])
             sources.extend(option["sources"])
             driving.extend(option["driving"])
             motorized.extend(option.get('motorized', option['driving']))
             if len(points) > MAX_POINTS:
                 raise ValueError("Combined route exceeds the point limit")
-        Route(points, speeds=speeds, sources=sources, driving=driving, motorized=motorized, stops=stops, planned_stops=planned_stops)
-        return {"points": points, "speeds": speeds, "sources": sources, "driving": driving, "motorized": motorized, "stops": stops, "planned_stops": planned_stops}
+        Route(points, speeds=speeds, sources=sources, driving=driving, motorized=motorized, stops=stops, planned_stops=planned_stops, legs=legs)
+        return {"points": points, "speeds": speeds, "sources": sources, "driving": driving, "motorized": motorized, "stops": stops, "planned_stops": planned_stops, "legs": legs}
 
     def serialize(self):
         return {"format": "locus-route", "version": 1, "there_and_back": self.there_and_back, "pins": copy.deepcopy(self.pins), "legs": [self.spec(i) for i in range(len(self.pins) - 1)]}

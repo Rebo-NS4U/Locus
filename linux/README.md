@@ -60,6 +60,21 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   with acceleration and braking toward turns/lower limits. Missing data is labeled
   as an estimate. Manual speed overrides are available per segment. This estimates
   simulated movement; it does not sense the phone's actual vehicle speed or live traffic.
+- During playback, the active leg is emphasized on the map and its two numbered
+  stops are highlighted in both the map and the route list, including the return
+  leg of a There and back trip. A status label shows the current stop pair.
+- Driving occasionally yields at mapped crosswalks: a 30% chance of a 2–8 second
+  pause. Simulated red-light stops queue 3–20 metres before the signal when space
+  permits; queues stay within the current vehicle leg and do not pass earlier
+  controls. These waits simulate traffic, not live pedestrian or signal detection.
+- Motion uses gradual acceleration/braking and smoothly drifting speed variation
+  (enabled by default). Driving stays within its mapped or manual target speed.
+  Curve limits are precomputed with a fast range lookup so playback avoids repeated
+  geometry calculations, including on dense tracks.
+- The planner reuses unchanged leg results for five minutes, with separate entries
+  for travel mode, speed, service endpoints and traffic-control choices. Editing
+  one leg does not reroute every unchanged leg. The cache is bounded to 256 entries
+  and 200,000 geometry points; public-service request throttling is preserved.
 - Visible red STOP signs and traffic-light icons mark detected driving controls
   on planned routes. Hover for the control type and simulated behavior.
 - Auto stops at mapped stop signs and lights, enabled by default. Signs get varied

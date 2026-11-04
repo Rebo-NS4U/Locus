@@ -23,7 +23,7 @@ def attach_controls(option, trace, elements):
     """Insert controls on their actual traversed way, respecting tagged direction."""
     points = option['points']
     edges = trace.get('edges', [])
-    nodes = {int(e['id']): e for e in elements if e.get('type') == 'node' and e.get('tags', {}).get('highway') in ('stop', 'traffic_signals')}
+    nodes = {int(e['id']): e for e in elements if e.get('type') == 'node' and e.get('tags', {}).get('highway') in ('stop', 'traffic_signals', 'crossing')}
     node_ways = {node: set() for node in nodes}
     for way in elements:
         if way.get('type') == 'way':
@@ -59,7 +59,7 @@ def attach_controls(option, trace, elements):
             if matches:
                 offset, index, fraction, projected = min(matches)
                 if offset <= 12:
-                    add(index, fraction, 'stop_sign' if tags['highway'] == 'stop' else 'traffic_light', projected)
+                    add(index, fraction, 'stop_sign' if tags['highway'] == 'stop' else 'crosswalk' if tags['highway'] == 'crossing' else 'traffic_light', projected)
         if provider_light and not mapped_light_near_end:
             add(max(0, last - 1), 1 if last else 0, 'traffic_light', points[last])
     output, controls = [points[0]], []
@@ -84,12 +84,15 @@ def attach_controls(option, trace, elements):
 
 
 class TrafficSchedule:
-    def __init__(self, controls, enabled=True, red_probability=.45, rng=None, after=-1):
+    def __init__(self, controls, enabled=True, red_probability=.45, rng=None, after=-1, crosswalk_probability=.3):
         if not math.isfinite(red_probability) or not 0 <= red_probability <= 1:
             raise ValueError('Red-light probability must be between zero and one')
+        if not math.isfinite(crosswalk_probability) or not 0 <= crosswalk_probability <= 1:
+            raise ValueError('Crosswalk probability must be between zero and one')
         self.events = []
         self.waiting = None
         self.remaining = 0.0
+        self.served_through = after
         rng = rng or random.Random()
         if not enabled:
             return
@@ -99,16 +102,24 @@ class TrafficSchedule:
                 continue
             if grouped and control['distance'] - grouped[-1][0] <= 3:
                 grouped[-1][1].add(control['kind'])
+                grouped[-1][2] = max(grouped[-1][2], control.get('min_distance', 0))
             else:
-                grouped.append((control['distance'], {control['kind']}))
-        for meters, kinds in grouped:
+                grouped.append([control['distance'], {control['kind']}, control.get('min_distance', 0)])
+        previous = max(0, after + .01)
+        for meters, kinds, minimum in grouped:
             if 'traffic_light' in kinds and rng.random() < red_probability:
                 kind, seconds = 'traffic_light', rng.triangular(8, 65, 25)
             elif 'stop_sign' in kinds:
                 kind, seconds = 'stop_sign', rng.triangular(2, 5, 3)
+            elif 'crosswalk' in kinds and rng.random() < crosswalk_probability:
+                kind, seconds = 'crosswalk', rng.triangular(2, 8, 4)
             else:
                 continue
-            self.events.append({'distance': meters, 'kind': kind, 'seconds': seconds})
+            stop_at = max(minimum, previous, meters - rng.uniform(3, 20)) if kind == 'traffic_light' else meters
+            stop_at = min(meters, stop_at)
+            self.events.append({'distance': stop_at, 'kind': kind, 'seconds': seconds,
+                                'stop_line_distance': meters, 'queue_distance': meters - stop_at})
+            previous = stop_at + .01
 
     @property
     def upcoming(self):
@@ -116,6 +127,7 @@ class TrafficSchedule:
 
     def arrive(self):
         self.waiting = self.events.pop(0)
+        self.served_through = max(self.served_through, self.waiting.get('stop_line_distance', self.waiting['distance']))
         self.remaining = self.waiting['seconds']
 
     def hold(self, elapsed):

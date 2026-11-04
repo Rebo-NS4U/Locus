@@ -44,7 +44,7 @@ def interpolate(a, b, fraction):
 
 
 class Route:
-    def __init__(self, points, speeds=None, sources=None, driving=None, motorized=None, stops=None, planned_stops=None):
+    def __init__(self, points, speeds=None, sources=None, driving=None, motorized=None, stops=None, planned_stops=None, legs=None):
         if not 2 <= len(points) <= MAX_POINTS:
             raise ValueError(f"A route needs 2–{MAX_POINTS} points.")
         self.points = [coordinates(*p) for p in points]
@@ -65,13 +65,49 @@ class Route:
                 raise ValueError("Speed metadata must match every route edge")
         if self.speeds is not None and any(not isinstance(s, (int, float)) or not math.isfinite(s) or not .1 <= s <= 100 for s in self.speeds):
             raise ValueError("Route speeds must be 0.1–100 m/s")
+        self.motor_starts = []
+        first_motor = 0
+        for i, vehicle in enumerate(self.motorized):
+            if not vehicle:
+                first_motor = i + 1
+            self.motor_starts.append(first_motor)
+        self.legs = []
+        for i, leg in enumerate(legs or []):
+            first, last = leg.get('first'), leg.get('last')
+            if type(first) is not int or type(last) is not int or not 0 <= first < last < len(self.points):
+                raise ValueError('Invalid route leg boundaries')
+            self.legs.append({**leg, 'index': i, 'start': self.lengths[first], 'end': self.lengths[last]})
+        self.leg_ends = [leg['end'] for leg in self.legs]
+        self.curve_caps = list(self.speeds or [])
+        if self.speeds:
+            for i in range(1, len(self.points) - 1):
+                a, b, c = self.points[i - 1:i + 2]
+                ab, bc, ac = self.lengths[i] - self.lengths[i - 1], self.lengths[i + 1] - self.lengths[i], distance(a, c)
+                if ab > .1 and bc > .1:
+                    cosine = max(-1, min(1, (ab * ab + bc * bc - ac * ac) / (2 * ab * bc)))
+                    turn = 180 - math.degrees(math.acos(cosine))
+                    cap = 8 if turn > 120 else 15 if turn > 60 else 25 if turn > 30 else float('inf')
+                    self.curve_caps[i] = min(self.speeds[i], cap / 3.6)
+        # Range minima make the 150 m braking lookahead logarithmic even on
+        # dense geometry. cap² + 6*distance preserves the same braking formula.
+        self.curve_tree_size = 1 << max(0, len(self.curve_caps) - 1).bit_length()
+        self.curve_tree = [float('inf')] * (2 * self.curve_tree_size)
+        for i, cap in enumerate(self.curve_caps):
+            self.curve_tree[self.curve_tree_size + i] = cap * cap + 6 * self.lengths[i]
+        for i in range(self.curve_tree_size - 1, 0, -1):
+            self.curve_tree[i] = min(self.curve_tree[2 * i], self.curve_tree[2 * i + 1])
         self.stops = []
         for entry in stops or []:
             index, kind = entry.get('index'), entry.get('kind')
-            if type(index) is not int or not 0 <= index < len(self.points) or kind not in ('stop_sign', 'traffic_light'):
+            if type(index) is not int or not 0 <= index < len(self.points) or kind not in ('stop_sign', 'traffic_light', 'crosswalk'):
                 raise ValueError('Invalid mapped traffic control')
             if self.lengths[index] < self.total - .1 and (self.motorized[min(index, len(self.motorized) - 1)] or self.motorized[max(0, index - 1)]):
-                self.stops.append({'distance': self.lengths[index], 'kind': kind})
+                edge = min(index, len(self.motorized) - 1)
+                if not self.motorized[edge]:
+                    edge = max(0, index - 1)
+                leg = self.leg_at(self.lengths[index], arriving=True)
+                minimum = max(self.lengths[self.motor_starts[edge]], leg['start'] if leg else 0)
+                self.stops.append({'distance': self.lengths[index], 'kind': kind, 'min_distance': minimum})
 
         from .departures import departure
         self.planned_stops = []
@@ -83,6 +119,13 @@ class Route:
             if rule['mode'] != 'none':
                 self.planned_stops.append({'distance': self.lengths[index], 'stop': entry.get('stop', index + 1), **rule})
 
+    def leg_at(self, meters, arriving=False):
+        if not self.legs:
+            return None
+        bisect_fn = bisect.bisect_left if arriving else bisect.bisect_right
+        index = min(len(self.legs) - 1, bisect_fn(self.leg_ends, meters))
+        return dict(self.legs[index])
+
     def edge_at(self, meters):
         return min(len(self.points) - 2, max(0, bisect.bisect_right(self.lengths, meters) - 1))
 
@@ -92,27 +135,21 @@ class Route:
     def desired_speed(self, meters):
         index = self.edge_at(meters)
         speed = self.speeds[index]
-        if not self.driving or not self.driving[index]:
+        if not self.motorized[index]:
             return speed
-        # Brake toward lower limits and sharp turns before reaching them.
-        for edge in range(index + 1, len(self.points) - 1):
-            ahead = self.lengths[edge] - meters
-            if ahead > 150:
-                break
-            cap = self.speeds[edge]
-            a, b, c = self.points[edge - 1:edge + 2]
-            ab, bc, ac = distance(a, b), distance(b, c), distance(a, c)
-            if ab > .1 and bc > .1:
-                cosine = max(-1, min(1, (ab * ab + bc * bc - ac * ac) / (2 * ab * bc)))
-                turn = 180 - math.degrees(math.acos(cosine))
-                if turn > 120:
-                    cap = min(cap, 8 / 3.6)
-                elif turn > 60:
-                    cap = min(cap, 15 / 3.6)
-                elif turn > 30:
-                    cap = min(cap, 25 / 3.6)
-            speed = min(speed, math.sqrt(cap * cap + 2 * 3 * max(0, ahead)))
-        return speed
+        first = self.curve_tree_size + index + 1
+        last = self.curve_tree_size + min(len(self.curve_caps), bisect.bisect_right(self.lengths, meters + 150))
+        minimum = float('inf')
+        while first < last:
+            if first & 1:
+                minimum = min(minimum, self.curve_tree[first])
+                first += 1
+            if last & 1:
+                last -= 1
+                minimum = min(minimum, self.curve_tree[last])
+            first //= 2
+            last //= 2
+        return min(speed, math.sqrt(max(0, minimum - 6 * meters)))
 
     def advance(self, meters, seconds, cap, factor=1):
         # Consume time separately on either side of a mode/speed boundary.
