@@ -3,7 +3,7 @@ const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
 tiles.on('tileerror', () => { document.getElementById('notice').hidden = false; });
-let acknowledged, routeLine, bridge, stopMarkers = [], legLines = [], activeLeg = null, follow = true;
+let acknowledged, routeLine, bridge, stopMarkers = [], legLines = [], follow = true;
 let palette = {accent: '#ffb77e', text: '#efdfd6', bg: '#423429'};
 window.setTheme = colors => {
   palette = colors;
@@ -28,27 +28,16 @@ window.setAcknowledged = (point, connected) => {
   acknowledged.bindTooltip(connected ? 'Last acknowledged location' : 'Last acknowledged location · connection lost');
   if (follow && connected) map.panTo(point, {animate: true, duration: 0.3});
 };
-window.setActiveLeg = leg => {
-  activeLeg = leg;
-  legLines.forEach((line, index) => {
-    const active = leg && index === leg.index;
-    line.setStyle({weight: active ? 8 : line.options.baseWeight,
-      opacity: leg ? (active ? 1 : .35) : line.options.baseOpacity});
-    if (active) line.bringToFront();
-  });
-  stopMarkers.forEach((marker, index) => {
-    const element = marker.getElement();
-    if (element) element.classList.toggle('route-stop-active', Boolean(leg && (index + 1 === leg.from_stop || index + 1 === leg.to_stop)));
-  });
-};
+// Playback highlighting lives in the route editor; keep the bridge API stable.
+window.setActiveLeg = () => {};
 window.setRoute = (points, stops, segments = [], selected = -1) => {
   if (routeLine) routeLine.remove();
   routeLine = L.featureGroup().addTo(map);
   legLines = [];
   const pieces = segments.length ? segments : [{points: points.length ? points : stops, ready: Boolean(points.length), color: palette.accent, controls: [], label: 'Route'}];
   pieces.forEach((segment, index) => {
-    const line = L.polyline(segment.points, {segmentColor: segment.color, color: segment.color, weight: index === selected ? 6 : 4, opacity: segment.ready ? 0.9 : 0.5, dashArray: segment.ready ? null : '6,8', bubblingMouseEvents: false}).addTo(routeLine);
-    line.options.baseWeight = index === selected ? 6 : 4;
+    const line = L.polyline(segment.points, {segmentColor: segment.color, color: segment.color, weight: 4, opacity: segment.ready ? 0.9 : 0.5, dashArray: segment.ready ? null : '6,8', bubblingMouseEvents: false}).addTo(routeLine);
+    line.options.baseWeight = 4;
     line.options.baseOpacity = segment.ready ? .9 : .5;
     legLines.push(line);
     line.bindTooltip(`${segment.from_stop || index + 1} → ${segment.to_stop || index + 2} · ${segment.label}${segment.ready ? '' : ' · needs planning'}`);
@@ -75,7 +64,6 @@ window.setRoute = (points, stops, segments = [], selected = -1) => {
     });
     return stop;
   });
-  window.setActiveLeg(activeLeg);
 };
 window.fitRoute = () => {
   if (routeLine && routeLine.getBounds().isValid()) map.fitBounds(routeLine.getBounds(), {padding: [35, 35]});

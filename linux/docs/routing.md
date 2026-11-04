@@ -8,6 +8,12 @@ the list or click its colored line on the map to edit its shape and speed.
 Selecting a stop edits its incoming segment (the first stop uses the first segment)
 and makes that stop the target for Insert, Remove and reorder controls.
 
+The route editor highlights the selected stop and the stops of the active leg.
+Map lines keep their normal width and opacity during selection and playback.
+Each stop card has a **Delete** button: one click removes that stop without
+selecting it first, subject to the usual movement/editing guard. Return-trip
+cards remove their corresponding original stop.
+
 ## Per-segment route types
 
 Choose **Travel mode** (Walk, Run, Cycle or Drive), then **Path type** separately.

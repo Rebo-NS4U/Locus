@@ -28,8 +28,10 @@ class RouteEditorMixin:
                 self.status.setText(speed_text(str(error)))
 
     def remove_stop(self):
-        index = self.selected_stop()
-        if index >= 0 and self.editable_route():
+        self.remove_stop_at(self.selected_stop())
+
+    def remove_stop_at(self, index):
+        if 0 <= index < len(self.stops) and self.editable_route():
             self.route_plan.remove(index)
             self.stops_changed()
 

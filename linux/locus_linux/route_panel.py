@@ -345,6 +345,10 @@ class RoutePanelMixin:
         title_label = QLabel(title)
         title_label.setObjectName('stopTitle')
         heading.addWidget(title_label, 1)
+        delete_button = QPushButton('Delete')
+        delete_button.setAccessibleName(f'Delete {title}')
+        delete_button.clicked.connect(lambda checked=False: self.remove_stop_at(number - 1))
+        heading.addWidget(delete_button)
         content.addLayout(heading)
         for value, role in [(timing, 'subtitle'), (onward, 'stopLeg')]:
             label = QLabel(value)
@@ -352,6 +356,8 @@ class RoutePanelMixin:
             label.setWordWrap(True)
             content.addWidget(label)
         card.setToolTip(text)
-        card.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        card.mousePressEvent = lambda event: self.route_list.setCurrentItem(item)
+        for label in card.findChildren(QLabel):
+            label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         item.setSizeHint(QSize(0, 122))
         self.route_list.setItemWidget(item, card)
