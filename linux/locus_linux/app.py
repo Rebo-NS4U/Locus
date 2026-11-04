@@ -13,7 +13,7 @@ from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QListWidgetItem, QComboBox, QDoubleSpinBox, QMessageBox, QLineEdit, QListWidget,
     QTabWidget, QGroupBox, QCheckBox, QSplitter, QFileDialog, QInputDialog,
-    QSystemTrayIcon, QScrollArea, QGridLayout, QDialog, QSizePolicy, QToolButton, QMenu, QSpinBox, QTimeEdit)
+    QSystemTrayIcon, QScrollArea, QGridLayout, QDialog, QSizePolicy, QToolButton, QMenu, QSpinBox)
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
@@ -113,6 +113,58 @@ class MapBridge(QObject):
     def selectLeg(self, index):
         self.segment_selected.emit(index)
 
+
+
+class DepartureTimePicker(QWidget):
+    """Twelve-hour selection using the application's themed dropdowns."""
+    timeChanged = Signal(QTime)
+
+    def __init__(self, initial, parent=None):
+        super().__init__(parent)
+        self.updating = False
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        self.hour, self.minute, self.period = QComboBox(), QComboBox(), QComboBox()
+        for hour in range(1, 13):
+            self.hour.addItem(str(hour), hour)
+        for minute in range(60):
+            self.minute.addItem(f'{minute:02d}', minute)
+        self.period.addItems(['AM', 'PM'])
+        for widget, label in ((self.hour, 'Departure hour'), (self.minute, 'Departure minute'), (self.period, 'AM or PM')):
+            widget.setAccessibleName(label)
+            widget.setToolTip(label)
+            widget.setMaxVisibleItems(10)
+            widget.setMinimumWidth(64)
+            widget.currentIndexChanged.connect(self.selection_changed)
+        layout.addWidget(self.hour, 1)
+        layout.addWidget(QLabel(':'))
+        layout.addWidget(self.minute, 1)
+        layout.addWidget(self.period, 1)
+        self.setTime(initial)
+
+    def selection_changed(self, *unused):
+        if not self.updating:
+            self.timeChanged.emit(self.time())
+
+    def time(self):
+        hour = self.hour.currentData() % 12 + (12 if self.period.currentText() == 'PM' else 0)
+        return QTime(hour, self.minute.currentData())
+
+    def setTime(self, value):
+        if not value.isValid():
+            return
+        previous = self.time()
+        self.updating = True
+        self.hour.setCurrentIndex(self.hour.findData(value.hour() % 12 or 12))
+        self.minute.setCurrentIndex(self.minute.findData(value.minute()))
+        self.period.setCurrentIndex(1 if value.hour() >= 12 else 0)
+        self.updating = False
+        if previous != self.time():
+            self.timeChanged.emit(self.time())
+
+    def text(self):
+        return self.time().toString('h:mm AP')
 
 
 class StatusLabel(QLabel):
@@ -493,8 +545,7 @@ class Window(QMainWindow):
         self.departure_seconds.setSuffix(' seconds')
         self.departure_seconds.setAccessibleName('Stop timer duration')
         departure_layout.addWidget(self.departure_seconds)
-        self.departure_time = QTimeEdit(QTime(9, 0))
-        self.departure_time.setDisplayFormat('h:mm AP')
+        self.departure_time = DepartureTimePicker(QTime(9, 0))
         self.departure_time.setAccessibleName('Local departure time')
         self.departure_time.setToolTip('Computer local time. If arrival is later, wait until tomorrow.')
         departure_layout.addWidget(self.departure_time)
