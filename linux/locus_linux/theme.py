@@ -92,7 +92,7 @@ def apply_theme(app, colors=None):
         QPushButton#primary:pressed { background: %(primary_hover)s; border-color: %(text)s; }
         QPushButton:disabled, QPushButton#primary:disabled, QToolButton:disabled { background: %(disabled)s; color: %(muted)s; border-color: %(border)s; }
         QToolButton::menu-indicator { image: none; }
-        QLineEdit, QDoubleSpinBox, QSpinBox, QComboBox, QListWidget, QTextEdit, QPlainTextEdit { background: %(field)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 12px; padding: 6px; selection-background-color: %(accent)s; selection-color: %(on_accent)s; }
+        QLineEdit, QDoubleSpinBox, QSpinBox, QTimeEdit, QComboBox, QListWidget, QTextEdit, QPlainTextEdit { background: %(field)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 12px; padding: 6px; selection-background-color: %(accent)s; selection-color: %(on_accent)s; }
         QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus, QComboBox:focus, QListWidget:focus { border-color: %(accent)s; }
         QComboBox QAbstractItemView { background: %(surface)s; color: %(text)s; selection-background-color: %(accent)s; selection-color: %(on_accent)s; border: 1px solid %(border)s; }
         QListWidget::item { padding: 6px; border-radius: 8px; }

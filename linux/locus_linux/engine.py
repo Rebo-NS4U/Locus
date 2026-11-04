@@ -18,7 +18,7 @@ def coordinates(latitude, longitude):
 
 
 class Session:
-    def __init__(self, transport, journal: Path, notify=lambda message: None, changed=lambda state: None, traffic_rng=None):
+    def __init__(self, transport, journal: Path, notify=lambda message: None, changed=lambda state: None, traffic_rng=None, wall_clock=time.time):
         self.transport, self.journal, self.notify = transport, journal, notify
         self.lock = asyncio.Lock()
         self.device = None
@@ -43,6 +43,8 @@ class Session:
         self.red_probability = .45
         self.traffic_rng = traffic_rng or random.Random()
         self.traffic = None
+        self.departures = None
+        self.wall_clock = wall_clock
 
     def snapshot(self):
         return {"mode": self.mode, "paused": self.paused, "position": self.last_ack,
@@ -50,6 +52,7 @@ class Session:
                 "total": self.route.total if self.route and self.mode == "route" else 0,
                 "speed_kph": self.motion_speed * 3.6,
                 "speed_source": self.route.sources[self.route.edge_at(self.progress)] if self.route and self.route.sources and self.mode == "route" else "manual / global",
+                "planned_stop": self.departures.snapshot() if self.mode == "route" and self.departures else None,
                 "traffic_stop": {"kind": self.traffic.waiting['kind'], "remaining": self.traffic.remaining} if self.mode == 'route' and self.traffic and self.traffic.waiting else None}
 
     async def configure_traffic(self, enabled, red_probability=.45):
@@ -85,13 +88,26 @@ class Session:
             self.motion_speed = 0 if not route.speeds or (route.driving and route.driving[0]) else route.speeds[0]
             from .traffic import TrafficSchedule
             self.traffic = TrafficSchedule(route.stops, self.traffic_enabled, self.red_probability, self.traffic_rng)
+            from .departures import DepartureSchedule
+            self.departures = DepartureSchedule(route.planned_stops, self.wall_clock)
+            if self.departures.upcoming and self.departures.upcoming['distance'] <= .01:
+                self.departures.arrive()
+                self.motion_speed = 0
             self.last_tick = time.monotonic()
             self.changed(self.snapshot())
         return "Following route. Pause holds the current location."
 
     async def control(self, action):
         async with self.lock:
-            if action == "hold":
+            if action == 'depart':
+                if self.mode != 'route' or not self.departures or not self.departures.waiting:
+                    raise ValueError('The route is not waiting at a planned stop')
+                if self.paused or self.target is None:
+                    raise ValueError('Reconnect and resume the route before continuing')
+                if self.departures.waiting['mode'] != 'manual':
+                    raise ValueError('This stop leaves automatically when its timer or departure time is reached')
+                self.departures.release()
+            elif action == "hold":
                 self.mode, self.vector = "fixed", (0, 0)
                 self.motion_speed = 0
             elif action == "pause":
@@ -102,14 +118,14 @@ class Session:
             elif action == "resume":
                 if self.target is None or not self.route or self.mode != "route":
                     raise ValueError("Reconnect the phone and start a route before resuming.")
-                if self.progress >= self.route.total:
+                if self.progress >= self.route.total and not (self.departures and self.departures.waiting):
                     raise ValueError("Route has finished. Start it again to replay.")
                 self.paused = False
             else:
                 raise ValueError("Unknown movement action")
             self.last_tick = time.monotonic()
             self.changed(self.snapshot())
-        return "Holding location." if action != "resume" else "Route resumed."
+        return "Leaving planned stop." if action == "depart" else "Holding location." if action != "resume" else "Route resumed."
 
     async def joystick(self, east, north):
         if not all(isinstance(v, (int, float)) and math.isfinite(v) and -1 <= v <= 1 for v in (east, north)):
@@ -158,6 +174,7 @@ class Session:
             self.mode, self.vector = "fixed", (0, 0)
             self.motion_speed = 0
             self.traffic = None
+            self.departures = None
             try:
                 await self.transport.set(device, *target)
             except BaseException:
@@ -197,15 +214,24 @@ class Session:
                     candidate = offset(candidate, self.vector[0] * meters, self.vector[1] * meters)
                     self.motion_speed = speed * math.hypot(*self.vector)
                 elif self.mode == "route" and not self.paused:
-                    if self.progress >= self.route.total and self.loop_route:
+                    if self.progress >= self.route.total and self.loop_route and not (self.departures and self.departures.waiting):
                         self.progress = 0
                         from .traffic import TrafficSchedule
                         self.traffic = TrafficSchedule(self.route.stops, self.traffic_enabled, self.red_probability, self.traffic_rng)
+                        from .departures import DepartureSchedule
+                        self.departures = DepartureSchedule(self.route.planned_stops, self.wall_clock)
+                        if self.departures.upcoming and self.departures.upcoming['distance'] <= .01:
+                            self.departures.arrive()
                     previous = self.progress
                     duration = max(0, min(elapsed, 2))
                     waiting = self.traffic and self.traffic.waiting
                     upcoming = self.traffic.upcoming if self.traffic else None
-                    if waiting:
+                    planned_waiting = self.departures and self.departures.waiting
+                    planned_next = self.departures.upcoming if self.departures and not planned_waiting else None
+                    if planned_waiting:
+                        self.departures.hold(duration)
+                        self.motion_speed = 0
+                    elif waiting:
                         self.traffic.hold(duration)
                         self.motion_speed = 0
                     elif self.route.speeds:
@@ -213,6 +239,8 @@ class Session:
                         automatic = (self.route.driving and self.route.driving[edge]) or (self.traffic_enabled and self.route.stops and self.route.motorized[edge])
                         factor = random.uniform(.9, 1 if automatic else 1.1) if self.variation else 1
                         desired = self.route.desired_speed(self.progress) * factor
+                        if planned_next:
+                            desired = min(desired, math.sqrt(2 * 3 * max(0, planned_next['distance'] - self.progress)))
                         if upcoming:
                             desired = min(desired, math.sqrt(2 * 3 * max(0, upcoming['distance'] - self.progress)))
                         if automatic:
@@ -224,12 +252,16 @@ class Session:
                     else:
                         self.progress = min(self.route.total, self.progress + meters)
                         self.motion_speed = speed
-                    if not waiting and upcoming and self.progress >= upcoming['distance'] - 1e-7:
+                    if not planned_waiting and planned_next and (not upcoming or planned_next['distance'] <= upcoming['distance'] + 1e-7) and self.progress >= planned_next['distance'] - 1e-7:
+                        self.progress = planned_next['distance']
+                        self.departures.arrive()
+                        self.motion_speed = 0
+                    if not planned_waiting and not waiting and upcoming and self.progress >= upcoming['distance'] - 1e-7:
                         self.progress = upcoming['distance']
                         self.traffic.arrive()
                         self.motion_speed = 0
                     candidate = self.route.at(self.progress)
-                    if self.progress >= self.route.total and not self.loop_route:
+                    if self.progress >= self.route.total and not self.loop_route and not (self.departures and self.departures.waiting):
                         self.paused = True
                         self.motion_speed = 0
                 if candidate != self.last_target:
@@ -263,6 +295,7 @@ class Session:
             self.paused, self.vector = True, (0, 0)
             self.motion_speed = 0
             self.traffic = None
+            self.departures = None
             if self.refresh:
                 self.refresh.cancel()
             # Never remove the recovery record if clear/teardown fails.

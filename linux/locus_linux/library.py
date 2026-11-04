@@ -21,6 +21,7 @@ def document(value):
     plan = RoutePlan()
     for pin in value.get('pins', []):
         plan.add(coordinates(*pin['point']))
+        plan.set_departure(len(plan.pins) - 1, pin.get('departure'))
     return plan.serialize()
 
 

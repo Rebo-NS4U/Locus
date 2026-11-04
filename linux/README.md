@@ -67,6 +67,14 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   default), with 8–65 second waits. Driving brakes before the control and restarts
   smoothly while fixed-location refresh continues through the wait. Signal phases
   and durations are simulated, not live traffic data.
+- Planned stops on individual route pins: pass through, wait for **Continue**,
+  wait for a timer (1 second to 7 days), or depart at a local time of day.
+  If that time has passed on arrival, departure is scheduled for tomorrow.
+  Timers freeze while the route is paused. Clock waits use the computer's local
+  time; after sleep or a disconnect, explicit Resume is still required. First and
+  final pins can have waits, and looping routes repeat their planned stops.
+  Stop rules survive draft recovery, library saves and project import/export;
+  GPX files do not carry departure rules. Waiting keeps location refresh active.
 - A built-in route library with named saves, search, open, rename and delete.
   Save updates the current route; **Save a copy to library** keeps a separate copy.
   Walking/driving/cycling settings and imported GPX tracks are retained. The current
@@ -151,6 +159,8 @@ pins. Map clicks do not send phone commands. **Set location** sends it to the se
 Use Move for joystick/imported-GPX speed controls. On Route, add or drag pins,
 choose **Walking**, **Driving** or **Cycling** for each segment. Paths refresh
 automatically after edits. **Plan route** remains available to retry.
+Select a numbered stop and use **Departure from stop** to set its wait rule.
+During a manual wait, press **Continue from stop**; timed stops leave automatically.
 Name the route and press **Save route** (Ctrl+S) to keep it inside Locus.
 **Saved routes** opens your searchable library; double-click a route or press
 **Open** to restore it. Rename and delete are available there. Opening editable

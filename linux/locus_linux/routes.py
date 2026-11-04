@@ -44,7 +44,7 @@ def interpolate(a, b, fraction):
 
 
 class Route:
-    def __init__(self, points, speeds=None, sources=None, driving=None, motorized=None, stops=None):
+    def __init__(self, points, speeds=None, sources=None, driving=None, motorized=None, stops=None, planned_stops=None):
         if not 2 <= len(points) <= MAX_POINTS:
             raise ValueError(f"A route needs 2–{MAX_POINTS} points.")
         self.points = [coordinates(*p) for p in points]
@@ -72,6 +72,16 @@ class Route:
                 raise ValueError('Invalid mapped traffic control')
             if self.lengths[index] < self.total - .1 and (self.motorized[min(index, len(self.motorized) - 1)] or self.motorized[max(0, index - 1)]):
                 self.stops.append({'distance': self.lengths[index], 'kind': kind})
+
+        from .departures import departure
+        self.planned_stops = []
+        for entry in planned_stops or []:
+            index = entry.get('index')
+            if type(index) is not int or not 0 <= index < len(self.points):
+                raise ValueError('Invalid planned stop location')
+            rule = departure(entry)
+            if rule['mode'] != 'none':
+                self.planned_stops.append({'distance': self.lengths[index], 'stop': entry.get('stop', index + 1), **rule})
 
     def edge_at(self, meters):
         return min(len(self.points) - 2, max(0, bisect.bisect_right(self.lengths, meters) - 1))
@@ -124,6 +134,8 @@ class Route:
         if meters >= self.total:
             return self.points[-1]
         i = bisect.bisect_right(self.lengths, meters) - 1
+        if meters == self.lengths[i]:
+            return self.points[i]
         fraction = (meters - self.lengths[i]) / (self.lengths[i + 1] - self.lengths[i])
         return interpolate(self.points[i], self.points[i + 1], fraction)
 

@@ -10,6 +10,7 @@ os.environ['XDG_CACHE_HOME'] = root.name + '/cache'
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtTest import QTest
+from PySide6.QtCore import QTime
 from locus_linux.app import Window, Worker
 from locus_linux.library import RouteLibrary
 from locus_linux.planning import RoutePlan
@@ -32,6 +33,13 @@ with patch.object(Worker, 'start'):
     assert first.route_plan.spec(1)['profile'] == 'car_roads'
     assert first.route_plan.spec(0)['profile'] == 'walk_auto'
     assert not first.route_plan.spec(0)['controls']
+    first.route_list.setCurrentRow(2)
+    first.departure_mode.setCurrentIndex(first.departure_mode.findData('timer'))
+    first.departure_seconds.setValue(90)
+    assert first.route_plan.pins[1]['departure'] == {'mode': 'timer', 'seconds': 90}
+    first.departure_mode.setCurrentIndex(first.departure_mode.findData('clock'))
+    first.departure_time.setTime(QTime(16, 30))
+    assert first.route_plan.pins[1]['departure'] == {'mode': 'clock', 'time': '16:30'}
     first.move_stop(0, 35.0001, -111)
     assert first.auto_plan_timer.isActive()
     first.ready = True
@@ -50,6 +58,7 @@ with patch.object(Worker, 'start'):
     second.busy = False
     assert second.stops[0] == (35.0001, -111)
     assert second.route_title.text() == 'Campus'
+    assert second.route_plan.pins[1]['departure'] == {'mode': 'clock', 'time': '16:30'}
     second.library_list.setCurrentRow(0)
     with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.Yes):
         second.delete_library_route()

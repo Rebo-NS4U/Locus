@@ -5,14 +5,15 @@ import json
 import os
 import sys
 import xml.etree.ElementTree as ET
+from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QThread, QUrl, Signal, Slot, Qt, QLockFile, QTimer, QEvent
+from PySide6.QtCore import QObject, QThread, QUrl, Signal, Slot, Qt, QLockFile, QTimer, QTime, QEvent
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QListWidgetItem, QComboBox, QDoubleSpinBox, QMessageBox, QLineEdit, QListWidget,
     QTabWidget, QGroupBox, QCheckBox, QSplitter, QFileDialog, QInputDialog,
-    QSystemTrayIcon, QScrollArea, QGridLayout, QDialog, QSizePolicy, QToolButton, QMenu)
+    QSystemTrayIcon, QScrollArea, QGridLayout, QDialog, QSizePolicy, QToolButton, QMenu, QSpinBox, QTimeEdit)
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
@@ -142,6 +143,7 @@ class Window(QMainWindow):
         self.planning_revision = None
         self.planning_document = None
         self.segment_loading = False
+        self.departure_loading = False
         self.map_loaded = False
         self.auto_plan_timer = QTimer(self)
         self.auto_plan_timer.setSingleShot(True)
@@ -477,6 +479,31 @@ class Window(QMainWindow):
             button.clicked.connect(lambda checked=False, step=direction: self.reorder_stop(step))
             row.addWidget(button)
         stops_box.addLayout(row)
+        self.departure_group = QGroupBox('Departure from selected stop')
+        departure_layout = QVBoxLayout(self.departure_group)
+        self.departure_mode = QComboBox()
+        for label, mode in [('Pass through', 'none'), ('Wait for Continue', 'manual'),
+                            ('Wait for a timer', 'timer'), ('Leave at a time of day', 'clock')]:
+            self.departure_mode.addItem(label, mode)
+        self.departure_mode.setToolTip('Select a numbered stop, then choose when to leave it')
+        departure_layout.addWidget(self.departure_mode)
+        self.departure_seconds = QSpinBox()
+        self.departure_seconds.setRange(1, 604800)
+        self.departure_seconds.setValue(60)
+        self.departure_seconds.setSuffix(' seconds')
+        self.departure_seconds.setAccessibleName('Stop timer duration')
+        departure_layout.addWidget(self.departure_seconds)
+        self.departure_time = QTimeEdit(QTime(9, 0))
+        self.departure_time.setDisplayFormat('HH:mm')
+        self.departure_time.setAccessibleName('Local departure time')
+        self.departure_time.setToolTip('Computer local time. If arrival is later, wait until tomorrow.')
+        departure_layout.addWidget(self.departure_time)
+        self.departure_seconds.hide()
+        self.departure_time.hide()
+        for signal in (self.departure_mode.currentIndexChanged, self.departure_seconds.valueChanged, self.departure_time.timeChanged):
+            signal.connect(self.update_departure)
+        self.departure_group.setEnabled(False)
+        box.addWidget(self.departure_group)
         self.segment_group = QGroupBox("Travel between stops")
         editor = QVBoxLayout(self.segment_group)
         editor.addWidget(QLabel("Travel mode"))
@@ -517,6 +544,7 @@ class Window(QMainWindow):
         box.addWidget(note)
         self.library_toggle.toggled.connect(lambda visible: self.route_stop_card.setVisible(not visible))
         self.library_toggle.toggled.connect(lambda visible: self.segment_group.setVisible(not visible))
+        self.library_toggle.toggled.connect(lambda visible: self.departure_group.setVisible(not visible))
         self.library_toggle.toggled.connect(lambda visible: note.setVisible(not visible))
         self.library_toggle.toggled.connect(lambda visible: heading.setText('Your route library' if visible else 'Build your next route'))
         self.library_toggle.toggled.connect(lambda visible: hint.setText('Saved locally. Ready for your next trip.' if visible else 'Choose your stops. Let Locus find the way.'))
@@ -557,6 +585,8 @@ class Window(QMainWindow):
         self.button("Pause", lambda: self.request("control", "pause"), row, True)
         self.button("Resume", lambda: self.request("control", "resume"), row, True)
         footer.addLayout(row)
+        self.continue_stop = self.button('Continue from stop', lambda: self.request('control', 'depart'), footer, True)
+        self.continue_stop.setVisible(False)
         self.progress = StatusLabel("Not following a route")
         self.progress.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.progress.setFixedHeight(self.progress.fontMetrics().lineSpacing() * 3 + 4)
@@ -779,6 +809,18 @@ class Window(QMainWindow):
         self.connection_badge.setStyleSheet(f"color: {self.colors['accent'] if state['connected'] else self.colors['muted']};")
         self.js("setAcknowledged", state["position"], state["connected"])
         self.progress.setText(f"{'Paused / holding' if state['paused'] else 'Following route'} · {state['progress'] / METRES_PER_MILE:.2f} / {state['total'] / METRES_PER_MILE:.2f} mi · {to_mph(state.get('speed_kph', 0)):.1f} mph\n{speed_text(state.get('speed_source', ''))}" if state["total"] else "Not following a route")
+        planned = state.get('planned_stop')
+        self.continue_stop.setVisible(bool(planned and planned['mode'] == 'manual'))
+        self.continue_stop.setEnabled(bool(planned and not state['paused'] and state['connected'] and not self.busy))
+        if planned:
+            label = f"At stop {planned['stop']} · "
+            if planned['mode'] == 'manual':
+                label += 'waiting for Continue'
+            elif planned['mode'] == 'timer':
+                label += f"{planned['remaining']:.0f}s remaining"
+            else:
+                label += 'departure ' + datetime.fromtimestamp(planned['deadline']).strftime('%a %H:%M')
+            self.progress.setText(label)
         if state.get('traffic_stop'):
             stop = state['traffic_stop']
             label = 'Stop sign' if stop['kind'] == 'stop_sign' else 'Simulated red light'
@@ -1009,7 +1051,9 @@ class Window(QMainWindow):
         self.route_list.blockSignals(True)
         self.route_list.clear()
         for i, point in enumerate(self.stops):
-            self.route_list.addItem(f"Stop {i + 1:02d}   {point[0]:.5f}, {point[1]:.5f}")
+            rule = self.route_plan.pins[i].get('departure', {'mode': 'none'})
+            marker = {'none': '', 'manual': ' · Continue', 'timer': ' · timer', 'clock': ' · scheduled'}[rule['mode']]
+            self.route_list.addItem(f"Stop {i + 1:02d}{marker}   {point[0]:.5f}, {point[1]:.5f}")
             if i < len(self.stops) - 1:
                 spec = self.route_plan.spec(i)
                 ready = bool(self.route_plan.results.get(self.route_plan.key(i)))
@@ -1063,7 +1107,40 @@ class Window(QMainWindow):
             self.segment_info.setText(text)
         self.route_options.blockSignals(False)
         self.segment_loading = False
+        self.select_departure()
         self.redraw_route()
+
+    def select_departure(self):
+        index = self.selected_stop()
+        valid = 0 <= index < len(self.route_plan.pins) and not self.imported_track
+        self.departure_group.setEnabled(valid)
+        self.departure_loading = True
+        if valid:
+            rule = self.route_plan.pins[index].get('departure', {'mode': 'none'})
+            self.departure_group.setTitle(f'Departure from stop {index + 1}')
+            self.departure_mode.setCurrentIndex(self.departure_mode.findData(rule['mode']))
+            self.departure_seconds.setValue(int(rule.get('seconds', 60)))
+            self.departure_time.setTime(QTime.fromString(rule.get('time', '09:00'), 'HH:mm'))
+            self.departure_seconds.setVisible(rule['mode'] == 'timer')
+            self.departure_time.setVisible(rule['mode'] == 'clock')
+        self.departure_loading = False
+
+    def update_departure(self, *unused):
+        if self.departure_loading or self.imported_track:
+            return
+        index = self.selected_stop()
+        if not 0 <= index < len(self.route_plan.pins):
+            return
+        if not self.editable_route():
+            self.select_departure()
+            return
+        rule = {'mode': self.departure_mode.currentData()}
+        if rule['mode'] == 'timer':
+            rule['seconds'] = self.departure_seconds.value()
+        elif rule['mode'] == 'clock':
+            rule['time'] = self.departure_time.time().toString('HH:mm')
+        self.route_plan.set_departure(index, rule)
+        self.stops_changed()
 
     def update_segment(self, *unused, mode_changed=False):
         index = self.selected_segment()
@@ -1211,11 +1288,13 @@ class Window(QMainWindow):
                 self.route_plan.reset([points[0], points[-1]])
                 self.stops_changed()
                 self.route_points, self.route_profile, self.imported_track = points, None, True
+                self.select_departure()
                 self.show_route_summary('Saved track')
             else:
                 plan = RoutePlan.deserialize(value) if len(value['pins']) >= 2 else RoutePlan()
                 if len(value['pins']) == 1:
                     plan.add(value['pins'][0]['point'])
+                    plan.set_departure(0, value['pins'][0].get('departure'))
                 for index in range(len(plan.pins) - 1):
                     plan.update(index, automatic_specification(plan.spec(index)))
                 self.route_plan = plan
@@ -1329,6 +1408,7 @@ class Window(QMainWindow):
                 self.route_points = points
                 self.route_profile = None
                 self.imported_track = True
+                self.select_departure()
                 self.remember_route_draft()
                 self.show_route_summary("Imported GPX")
                 self.js("fitRoute()")

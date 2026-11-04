@@ -4,6 +4,7 @@ import copy
 import math
 import uuid
 from .engine import coordinates
+from .departures import departure
 from .routes import Route, MAX_POINTS, distance
 
 MAX_PINS = 99
@@ -160,6 +161,12 @@ class RoutePlan:
         self.selected.pop(key, None)
         self.change()
 
+    def set_departure(self, index, value):
+        rule = departure(value)
+        if self.pins[index].get('departure', {'mode': 'none'}) != rule:
+            self.pins[index]['departure'] = rule
+            self.change()
+
     def requests(self):
         return [{"start": self.points[i], "end": self.points[i + 1], "spec": self.spec(i)} for i in range(len(self.pins) - 1)]
 
@@ -193,7 +200,7 @@ class RoutePlan:
         return result
 
     def assemble(self):
-        points, speeds, sources, driving, motorized, stops = [], [], [], [], [], []
+        points, speeds, sources, driving, motorized, stops, planned_stops = [], [], [], [], [], [], []
         for i in range(len(self.pins) - 1):
             key = self.key(i)
             if not self.results.get(key):
@@ -204,15 +211,22 @@ class RoutePlan:
                 raise ValueError("Segments do not join at the shared pin; replan the route")
             offset = len(points) - 1 if points else 0
             stops.extend({'index': stop['index'] + offset, 'kind': stop['kind']} for stop in option.get('stops', []))
+            if i == 0:
+                rule = departure(self.pins[0].get('departure'))
+                if rule['mode'] != 'none':
+                    planned_stops.append({'index': 0, 'stop': 1, **rule})
             points.extend(shape if not points else shape[1:])
+            rule = departure(self.pins[i + 1].get('departure'))
+            if rule['mode'] != 'none':
+                planned_stops.append({'index': len(points) - 1, 'stop': i + 2, **rule})
             speeds.extend(option["speeds"])
             sources.extend(option["sources"])
             driving.extend(option["driving"])
             motorized.extend(option.get('motorized', option['driving']))
             if len(points) > MAX_POINTS:
                 raise ValueError("Combined route exceeds the point limit")
-        Route(points, speeds=speeds, sources=sources, driving=driving, motorized=motorized, stops=stops)
-        return {"points": points, "speeds": speeds, "sources": sources, "driving": driving, "motorized": motorized, "stops": stops}
+        Route(points, speeds=speeds, sources=sources, driving=driving, motorized=motorized, stops=stops, planned_stops=planned_stops)
+        return {"points": points, "speeds": speeds, "sources": sources, "driving": driving, "motorized": motorized, "stops": stops, "planned_stops": planned_stops}
 
     def serialize(self):
         return {"format": "locus-route", "version": 1, "pins": copy.deepcopy(self.pins), "legs": [self.spec(i) for i in range(len(self.pins) - 1)]}
@@ -227,6 +241,7 @@ class RoutePlan:
         plan = cls()
         for pin in pins:
             plan.add(pin["point"])
+            plan.set_departure(len(plan.pins) - 1, pin.get("departure"))
         for i, spec in enumerate(legs):
             plan.update(i, spec)
         return plan
