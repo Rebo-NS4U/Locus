@@ -68,7 +68,7 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   smoothly while fixed-location refresh continues through the wait. Signal phases
   and durations are simulated, not live traffic data.
 - Planned stops on individual route pins: pass through, wait for **Continue**,
-  wait for a timer (1 second to 7 days), or depart at a local time of day.
+  wait for a timer (1 second to 7 days), or depart at a local time of day, displayed in 12-hour time with AM/PM.
   If that time has passed on arrival, departure is scheduled for tomorrow.
   Timers freeze while the route is paused. Clock waits use the computer's local
   time; after sleep or a disconnect, explicit Resume is still required. First and

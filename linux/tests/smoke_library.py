@@ -39,7 +39,13 @@ with patch.object(Worker, 'start'):
     assert first.route_plan.pins[1]['departure'] == {'mode': 'timer', 'seconds': 90}
     first.departure_mode.setCurrentIndex(first.departure_mode.findData('clock'))
     first.departure_time.setTime(QTime(16, 30))
+    assert first.departure_time.text() == '4:30 PM'
     assert first.route_plan.pins[1]['departure'] == {'mode': 'clock', 'time': '16:30'}
+    first.departure_time.setTime(QTime(0, 0))
+    assert first.departure_time.text() == '12:00 AM'
+    first.departure_time.setTime(QTime(12, 0))
+    assert first.departure_time.text() == '12:00 PM'
+    first.departure_time.setTime(QTime(16, 30))
     first.move_stop(0, 35.0001, -111)
     assert first.auto_plan_timer.isActive()
     first.ready = True

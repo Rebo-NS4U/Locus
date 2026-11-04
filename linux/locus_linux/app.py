@@ -494,7 +494,7 @@ class Window(QMainWindow):
         self.departure_seconds.setAccessibleName('Stop timer duration')
         departure_layout.addWidget(self.departure_seconds)
         self.departure_time = QTimeEdit(QTime(9, 0))
-        self.departure_time.setDisplayFormat('HH:mm')
+        self.departure_time.setDisplayFormat('h:mm AP')
         self.departure_time.setAccessibleName('Local departure time')
         self.departure_time.setToolTip('Computer local time. If arrival is later, wait until tomorrow.')
         departure_layout.addWidget(self.departure_time)
@@ -819,7 +819,7 @@ class Window(QMainWindow):
             elif planned['mode'] == 'timer':
                 label += f"{planned['remaining']:.0f}s remaining"
             else:
-                label += 'departure ' + datetime.fromtimestamp(planned['deadline']).strftime('%a %H:%M')
+                label += 'departure ' + datetime.fromtimestamp(planned['deadline']).strftime('%a %I:%M %p')
             self.progress.setText(label)
         if state.get('traffic_stop'):
             stop = state['traffic_stop']
