@@ -6,6 +6,8 @@ Reviewed with Blueprint Studio 1.1.4 on 2026-11-04.
   the Linux package, runs `pip check` and the unit suite with offscreen Qt, and
   builds a wheel on Python 3.12 and 3.14. Repository access is read-only and
   Actions are pinned to reviewed commit IDs.
+  The runner also installs `desktop-file-utils`, required by the launcher's
+  desktop-entry validation test.
 - **13 tests without obvious assertions: false positives.** All flagged files
   contain Python assertion calls. The complete local unit suite passed 124
   tests. Keep the existing behavioral assertions.
