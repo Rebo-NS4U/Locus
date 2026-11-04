@@ -65,6 +65,11 @@ def apply_theme(app, colors=None):
         QWidget#shell { background: %(glass)s; border: 1px solid %(edge)s; border-radius: 22px; }
         QWidget#toolbar { background: %(card)s; border: 1px solid %(edge)s; border-radius: 18px; }
         QWidget#statusbar { background: transparent; }
+        QWidget#deviceToolbar { background: %(card)s; border-radius: 12px; }
+        QWidget#navigationRail { background: %(card)s; border: 1px solid %(edge)s; border-radius: 14px; }
+        QPushButton#navigationItem { text-align: left; padding: 12px 14px; border-radius: 10px; }
+        QWidget#playbackDock { background: %(card)s; border: 1px solid %(edge)s; border-radius: 14px; }
+        QLabel#sectionTitle { color: %(accent)s; font-weight: 700; padding: 4px 8px; }
         QLabel#brand { color: %(accent)s; font-size: 16px; font-weight: 700; padding: 0 8px 0 0; }
         QLabel#pageTitle { font-size: 23px; font-weight: 700; padding-top: 8px; padding-bottom: 3px; }
         QLineEdit#routeName { font-size: 16px; font-weight: 600; padding: 10px; border-color: %(edge)s; }

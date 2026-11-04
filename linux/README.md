@@ -6,6 +6,16 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 
 ## Features
 
+- A persistent navigation rail opens Places, Routes, Movement, Map and Settings.
+  Phone selection and device tools have their own toolbar below the location actions.
+  Each workspace has a heading and a short description of its controls.
+- Route studio groups trip options with stops, switches between Stop timing and
+  Travel & speed for the selected row, and keeps Plan & playback in a fixed dock.
+  The library opens as a dedicated view within the route workspace; Route ⋯ groups
+  file actions beside Save, Open library and New. Timer values and units share one
+  row, with seconds, minutes, hours and days supported (up to seven days).
+  Show return stops exposes the reverse sequence; these stops still share their
+  locations and departure rules with the corresponding outbound stops.
 - Glass desktop redesign with a translucent rounded shell, inset action bar,
   soft sidebar cards, pill controls, slim scrollbars and frosted map overlays.
   Native window transparency uses the compositor’s background blur when enabled
@@ -15,10 +25,10 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   one font family, size and weight. Matching night and street maps.
   UI code changes take effect on the next launch; an active phone session is never
   restarted by installation. Without compositor blur, the tinted shell remains translucent.
-- Map-first layout: one compact action bar, a slim status line and a collapsible
+- Map-first layout: location and device toolbars, a slim status line and a collapsible
   Controls sidebar (`Ctrl+B`), hidden by default. Coordinates, map display and the
-  legend live in Controls → Map; scanning, preparation and setup are in the `⋯`
-  device menu. Tabs stay pinned while each page scrolls independently, and reopening
+  legend live in Controls → Map; scanning, preparation and setup are in the
+  Device options menu. Navigation stays pinned while each page scrolls independently, and reopening
   Controls preserves its width. Status updates keep the action bar and footer stable.
   Set location, Hold and Restore remain accessible with Controls hidden.
 - Explicit place search, map pins, coordinates, favorites, rename/delete and

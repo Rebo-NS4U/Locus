@@ -39,6 +39,19 @@ with patch.object(Worker, 'start'):
     first.departure_mode.setCurrentIndex(first.departure_mode.findData('timer'))
     first.departure_seconds.setValue(90)
     assert first.route_plan.pins[1]['departure'] == {'mode': 'timer', 'seconds': 90}
+    first.departure_seconds.setValue(5)
+    first.departure_unit.setCurrentIndex(first.departure_unit.findData(60))
+    assert first.route_plan.pins[1]['departure']['seconds'] == 300
+    assert first.departure_seconds.value() == 5
+    assert first.departure_seconds.maximum() == 10080
+    first.return_edit.setChecked(True)
+    assert first.route_list.count() == 9
+    first.route_list.setCurrentRow(6)
+    assert first.selected_stop() == 1
+    assert first.selection_editor.currentIndex() == 0
+    first.route_list.setCurrentRow(5)
+    assert first.selection_editor.currentIndex() == 1
+    first.route_list.setCurrentRow(2)
     first.departure_mode.setCurrentIndex(first.departure_mode.findData('clock'))
     first.departure_time.hour.setCurrentIndex(first.departure_time.hour.findData(4))
     first.departure_time.minute.setCurrentIndex(first.departure_time.minute.findData(30))

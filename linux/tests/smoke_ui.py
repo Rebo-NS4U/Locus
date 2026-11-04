@@ -97,8 +97,13 @@ def check():
             assert window.traffic_stops.isChecked()
             window.red_probability.setValue(100)
             assert not window.sidebar_scroll.isVisible()
-            assert window.map.width() >= window.width() * .95
-            assert window.map.height() >= window.height() * .85
+            # The navigation rail remains reachable when the inspector is hidden.
+            assert window.map.width() >= window.width() * .80
+            window.navigation_buttons[1].click()
+            assert window.tabs.currentIndex() == 1 and window.tabs.isVisible()
+            window.sidebar_toggle.setChecked(False)
+            app.processEvents()
+            assert window.map.height() >= window.height() * .75
             collapsed_width = window.map.width()
             window.worker.services.requester = fake_request
             window.map.page().runJavaScript("""
@@ -322,7 +327,7 @@ def check():
             marked = time.monotonic()
         elif stage == 7 and not window.busy and time.monotonic() - marked > 1.3:
             assert window.worker.session.progress > 0
-            assert window.map.width() >= window.width() * .95
+            assert window.map.width() >= window.width() * .80
             window.grab().save('/tmp/locus-linux-map-space.png')
             window.sidebar_toggle.setChecked(True)
             async def reach_control():

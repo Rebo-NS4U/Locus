@@ -16,6 +16,15 @@ from .route_panel import RoutePanelMixin
 
 
 class WindowUiMixin(RoutePanelMixin):
+    def page_heading(self, layout, title, description):
+        heading = QLabel(title)
+        heading.setObjectName('pageTitle')
+        layout.addWidget(heading)
+        hint = QLabel(description)
+        hint.setObjectName('subtitle')
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
     def button(self, label, callback, layout, foreground=False):
         button = QPushButton(label)
         button.clicked.connect(callback)
@@ -78,12 +87,40 @@ class WindowUiMixin(RoutePanelMixin):
         self.device_menu.addSeparator()
         self.device_menu.addAction("Setup guide", self.show_setup)
         self.device_menu_button.setMenu(self.device_menu)
-        header.addWidget(self.device_menu_button)
+        device_toolbar = QWidget()
+        device_toolbar.setObjectName('deviceToolbar')
+        device_row = QHBoxLayout(device_toolbar)
+        device_row.setContentsMargins(12, 4, 12, 4)
+        device_row.addWidget(QLabel('iPhone'))
+        header.removeWidget(self.connection)
+        header.removeWidget(self.devices)
+        device_row.addWidget(self.connection)
+        device_row.addWidget(self.devices, 1)
+        self.device_menu_button.setText('Device options')
+        device_row.addWidget(self.device_menu_button)
         header.addStretch(1)
         self.button("Set location", lambda: self.perform("apply"), header, True).setObjectName("primary")
         self.button("Hold", lambda: self.request("control", "hold"), header, True).setToolTip("Stop movement and hold the current simulated location")
         self.button("Restore", lambda: self.perform("restore"), header, True).setToolTip("Clear simulated location and close the phone connection")
         layout.addWidget(toolbar)
+        layout.addWidget(device_toolbar)
+        workspace = QHBoxLayout()
+        workspace.setSpacing(8)
+        navigation = QWidget()
+        navigation.setObjectName('navigationRail')
+        nav = QVBoxLayout(navigation)
+        nav.setContentsMargins(4, 8, 4, 8)
+        nav.setSpacing(6)
+        self.navigation_buttons = []
+        for index, label in enumerate(('Places', 'Routes', 'Movement', 'Map', 'Settings')):
+            button = QPushButton(label)
+            button.setCheckable(True)
+            button.setObjectName('navigationItem')
+            button.clicked.connect(lambda checked=False, page=index: self.open_workspace(page))
+            nav.addWidget(button)
+            self.navigation_buttons.append(button)
+        nav.addStretch()
+        workspace.addWidget(navigation)
         split = QSplitter()
         self.split = split
         split.setHandleWidth(12)
@@ -93,6 +130,8 @@ class WindowUiMixin(RoutePanelMixin):
         self.tabs.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.tabs.setStyleSheet("QTabBar::tab { padding: 7px 6px; }")
         self.tabs.setUsesScrollButtons(False)
+        self.tabs.tabBar().hide()
+        self.tabs.currentChanged.connect(self.sync_navigation)
         self.tab_scrolls = []
         for widget, title in [(self.places_tab(), "Places"), (self.route_tab(), "Route"),
                               (self.movement_tab(), "Move"), (self.map_tab(), "Map"), (self.settings_tab(), "Settings")]:
@@ -114,7 +153,7 @@ class WindowUiMixin(RoutePanelMixin):
                 self.tabs.addTab(route_page, title)
             else:
                 self.tabs.addTab(scroll, title)
-        self.sidebar_width = 380
+        self.sidebar_width = 440
         self.tabs.hide()
         split.addWidget(self.tabs)
         self.map = QWebEngineView()
@@ -137,7 +176,9 @@ class WindowUiMixin(RoutePanelMixin):
         split.setCollapsible(1, False)
         split.setCollapsible(0, False)
         self.sidebar_toggle.toggled.connect(self.toggle_sidebar)
-        layout.addWidget(split, 1)
+        workspace.addWidget(split, 1)
+        layout.addLayout(workspace, 1)
+        self.sync_navigation(self.tabs.currentIndex())
         statusbar = QWidget()
         statusbar.setObjectName("statusbar")
         footer = QHBoxLayout(statusbar)
@@ -156,6 +197,14 @@ class WindowUiMixin(RoutePanelMixin):
     def sidebar_scroll(self):
         return self.tab_scrolls[self.tabs.currentIndex()]
 
+    def open_workspace(self, index):
+        self.tabs.setCurrentIndex(index)
+        self.sidebar_toggle.setChecked(True)
+
+    def sync_navigation(self, index):
+        for page, button in enumerate(self.navigation_buttons):
+            button.setChecked(page == index)
+
     def toggle_sidebar(self, visible):
         self.release_keys()
         if not visible and self.tabs.isVisible():
@@ -172,6 +221,7 @@ class WindowUiMixin(RoutePanelMixin):
     def map_tab(self):
         page = QWidget()
         box = QVBoxLayout(page)
+        self.page_heading(box, 'Map & coordinates', 'Choose a location and adjust your map view.')
         fields = self.group("Coordinates", box)
         self.latitude, self.longitude = QDoubleSpinBox(), QDoubleSpinBox()
         for label, field, limit, value in [("Latitude", self.latitude, 90, 40.7128), ("Longitude", self.longitude, 180, -74.006)]:
@@ -201,6 +251,7 @@ class WindowUiMixin(RoutePanelMixin):
     def places_tab(self):
         page = QWidget()
         box = QVBoxLayout(page)
+        self.page_heading(box, 'Places', 'Search a destination or return to a saved place.')
         group = self.group("Find a place", box)
         row = QHBoxLayout()
         self.search = QLineEdit()
@@ -232,6 +283,7 @@ class WindowUiMixin(RoutePanelMixin):
     def movement_tab(self):
         page = QWidget()
         box = QVBoxLayout(page)
+        self.page_heading(box, 'Movement', 'Set your pace and control movement from here.')
         group = self.group("Joystick / imported GPX speed", box)
         self.travel_mode = QComboBox()
         self.travel_mode.addItems(SPEEDS)
@@ -286,6 +338,7 @@ class WindowUiMixin(RoutePanelMixin):
     def settings_tab(self):
         page = QWidget()
         box = QVBoxLayout(page)
+        self.page_heading(box, 'Settings', 'Manage connection recovery and map services.')
         group = self.group("Connection and recovery", box)
         self.reconnect = QCheckBox("Reconnect the same iPhone after a drop")
         self.reconnect.setChecked(self.store.data["settings"].get("reconnect", True))

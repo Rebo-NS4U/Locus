@@ -49,6 +49,8 @@ class RouteEditorMixin:
         if not self.editable_route():
             self.redraw_route()
             return
+        if self.return_edit.isChecked() and index >= len(self.stops):
+            index = 2 * len(self.stops) - 2 - index
         if 0 <= index < len(self.stops):
             try:
                 self.route_plan.move(index, coordinates(latitude, longitude))
@@ -70,13 +72,24 @@ class RouteEditorMixin:
 
     def selected_stop(self):
         row = self.route_list.currentRow()
-        return row // 2 if row >= 0 else -1
+        index = row // 2 if row >= 0 else -1
+        if index >= len(self.stops) and self.return_edit.isChecked():
+            index = 2 * len(self.stops) - 2 - index
+        return index
+
+    def _editor_stops(self):
+        if self.route_plan.there_and_back and self.return_edit.isChecked() and len(self.stops) >= 2:
+            return self.stops + self.stops[-2::-1]
+        return self.stops
 
     def selected_segment(self):
         row = self.route_list.currentRow()
         if row < 0 or len(self.stops) < 2:
             return -1
-        return max(0, (row - 1) // 2)
+        index = max(0, (row - 1) // 2)
+        if self.return_edit.isChecked() and index >= len(self.stops) - 1:
+            index = 2 * (len(self.stops) - 1) - 1 - index
+        return index
 
     def stops_changed(self, *, select_newest=False, selected_row=None):
         if selected_row is None:
@@ -88,17 +101,23 @@ class RouteEditorMixin:
         self.there_and_back.blockSignals(True)
         self.there_and_back.setChecked(self.route_plan.there_and_back)
         self.there_and_back.blockSignals(False)
+        self.return_edit.setVisible(self.route_plan.there_and_back and len(self.stops) >= 2)
+        if not self.route_plan.there_and_back:
+            self.return_edit.setChecked(False)
         if select_newest:
             selected_row = max(0, 2 * len(self.stops) - 3)
         self.route_list.blockSignals(True)
         self.route_list.clear()
-        for i, point in enumerate(self.stops):
-            rule = self.route_plan.pins[i].get('departure', {'mode': 'none'})
+        display_stops = self._editor_stops()
+        for i, point in enumerate(display_stops):
+            pin_index = i if i < len(self.stops) else 2 * len(self.stops) - 2 - i
+            rule = self.route_plan.pins[pin_index].get('departure', {'mode': 'none'})
             marker = {'none': '', 'manual': ' · Continue', 'timer': ' · timer', 'clock': ' · scheduled'}[rule['mode']]
-            self.route_list.addItem(f"Stop {i + 1:02d}{marker}   {point[0]:.5f}, {point[1]:.5f}")
-            if i < len(self.stops) - 1:
-                spec = self.route_plan.spec(i)
-                ready = bool(self.route_plan.results.get(self.route_plan.key(i)))
+            self.route_list.addItem(f"{'Return · ' if i >= len(self.stops) else ''}Stop {pin_index + 1:02d}{marker}   {point[0]:.5f}, {point[1]:.5f}")
+            if i < len(display_stops) - 1:
+                leg_index = i if i < len(self.stops) - 1 else 2 * (len(self.stops) - 1) - 1 - i
+                spec = self.route_plan.spec(leg_index)
+                ready = bool(self.route_plan.results.get(self.route_plan.key(leg_index)))
                 self.route_list.addItem(f"    {i + 1} → {i + 2} · {travel_mode(spec['profile'])} · {'ready' if ready else 'needs plan'}")
         if self.route_list.count():
             self.route_list.setCurrentRow(min(selected_row, self.route_list.count() - 1))
@@ -108,6 +127,14 @@ class RouteEditorMixin:
         self.rebuild_route()
         self.remember_route_draft()
         self.schedule_automatic_route()
+
+    def change_timer_unit(self, *unused):
+        if self.departure_loading:
+            return
+        self.departure_seconds.blockSignals(True)
+        self.departure_seconds.setMaximum(604800 // int(self.departure_unit.currentData()))
+        self.departure_seconds.blockSignals(False)
+        self.update_departure()
 
     def change_segment_travel(self, *unused):
         if not self.segment_loading:
@@ -152,6 +179,7 @@ class RouteEditorMixin:
         self.route_options.blockSignals(False)
         self.segment_loading = False
         self.select_departure()
+        self.selection_editor.setCurrentIndex(0 if self.route_list.currentRow() % 2 == 0 else 1)
         self.redraw_route()
 
     def select_departure(self):
@@ -163,9 +191,16 @@ class RouteEditorMixin:
             rule = self.route_plan.pins[index].get('departure', {'mode': 'none'})
             self.departure_group.setTitle(f'Departure from stop {index + 1}')
             self.departure_mode.setCurrentIndex(self.departure_mode.findData(rule['mode']))
-            self.departure_seconds.setValue(int(rule.get('seconds', 60)))
+            seconds = int(rule.get('seconds', 60))
+            multiplier = int(self.departure_unit.currentData())
+            if seconds % multiplier:
+                multiplier = 1
+            self.departure_unit.setCurrentIndex(self.departure_unit.findData(multiplier))
+            self.departure_seconds.setMaximum(604800 // multiplier)
+            self.departure_seconds.setValue(max(1, seconds // multiplier))
             self.departure_time.setTime(QTime.fromString(rule.get('time', '09:00'), 'HH:mm'))
             self.departure_seconds.setVisible(rule['mode'] == 'timer')
+            self.departure_unit.setVisible(rule['mode'] == 'timer')
             self.departure_time.setVisible(rule['mode'] == 'clock')
         self.departure_loading = False
 
@@ -180,7 +215,7 @@ class RouteEditorMixin:
             return
         rule = {'mode': self.departure_mode.currentData()}
         if rule['mode'] == 'timer':
-            rule['seconds'] = self.departure_seconds.value()
+            rule['seconds'] = self.departure_seconds.value() * int(self.departure_unit.currentData())
         elif rule['mode'] == 'clock':
             rule['time'] = self.departure_time.time().toString('HH:mm')
         self.route_plan.set_departure(index, rule)
@@ -308,6 +343,10 @@ class RouteEditorMixin:
             if self.imported_track:
                 self.refresh_imported_trip()
             self.status.setText(str(error))
+
+    def toggle_return_editor(self, enabled):
+        if self.route_plan.there_and_back:
+            self.stops_changed()
 
     def start_route(self):
         if len(self.route_points) < 2:
