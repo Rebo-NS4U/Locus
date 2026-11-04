@@ -75,6 +75,17 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
                 await operation
         self.assertEqual(self.transport.calls, [])
 
+    async def test_corrupt_recovery_blocks_device_changes_without_erasing_journal(self):
+        for content in ['{broken', '[]', '{}', '{"device": 3}',
+                        '{"device": "phone", "transport": "other"}']:
+            with self.subTest(content=content):
+                self.journal.write_text(content)
+                for operation in [self.session.apply('phone', 1, 2), self.session.restore('phone')]:
+                    with self.assertRaisesRegex(RuntimeError, 'Recovery record'):
+                        await operation
+                self.assertEqual(self.journal.read_text(), content)
+                self.assertEqual(self.transport.calls, [])
+
     async def test_refresh_failure_reports_unknown_and_stops(self):
         await self.session.apply("phone", 10, 20)
         self.transport.fail_set = True

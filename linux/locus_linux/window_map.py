@@ -187,8 +187,11 @@ class MapInteractionMixin:
     def save_favorite(self):
         name, ok = QInputDialog.getText(self, "Save favorite", "Place name", text=self.selected_name)
         if ok:
-            self.store.add("favorites", name, (self.latitude.value(), self.longitude.value()))
-            self.refresh_places()
+            try:
+                self.store.add("favorites", name, (self.latitude.value(), self.longitude.value()))
+                self.refresh_places()
+            except (OSError, ValueError) as error:
+                self.status.setText(f'Could not save favorite: {error}')
 
     def selected_saved(self):
         key = "favorites" if self.saved_tabs.currentIndex() == 0 else "recents"
@@ -199,11 +202,17 @@ class MapInteractionMixin:
         if index >= 0:
             name, ok = QInputDialog.getText(self, "Rename place", "Place name", text=self.store.data[key][index]["name"])
             if ok and name.strip():
-                self.store.rename(key, index, name)
-                self.refresh_places()
+                try:
+                    self.store.rename(key, index, name)
+                    self.refresh_places()
+                except (OSError, ValueError) as error:
+                    self.status.setText(f'Could not rename place: {error}')
 
     def remove_place(self):
         key, index = self.selected_saved()
         if index >= 0:
-            self.store.remove(key, index)
-            self.refresh_places()
+            try:
+                self.store.remove(key, index)
+                self.refresh_places()
+            except (OSError, ValueError) as error:
+                self.status.setText(f'Could not remove place: {error}')

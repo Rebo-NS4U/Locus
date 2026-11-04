@@ -256,6 +256,17 @@ State stays under `$XDG_STATE_HOME/locus-linux`, default `~/.local/state/locus-l
 phone ID, last requested target and transport for recovery. Files are mode 0600.
 Demo mode uses separate files. These personal files are never included in Git.
 
+If favorites/settings cannot be read or validated, Locus opens with defaults and
+reports the problem. The original `places.json` is preserved and saving places
+or settings is blocked until it is repaired and the app is reopened. Failed
+saves retain the previous in-memory and on-disk data. New save files are written
+privately and replaced atomically after the write completes.
+
+An unreadable recovery journal also leaves the app open for device discovery,
+but location changes and restore commands are blocked while ownership cannot
+be verified. The journal is retained; repair it from a known-good record before
+trying those actions again. No automatic reset or restore is claimed.
+
 ## Verification
 
 GitHub Actions runs the Linux unit suite with offscreen Qt on Python 3.12 and
@@ -275,6 +286,7 @@ libraries and `desktop-file-utils` are still required, as in CI.
 .venv/bin/pip check
 .venv/bin/python tests/smoke_ui.py  # requires a graphical session
 .venv/bin/python tests/smoke_library.py  # GUI route-library recovery and GPX saves
+.venv/bin/python tests/smoke_recovery.py  # corrupt state, visible errors and safe shutdown
 .venv/bin/python tests/smoke_map_cache.py  # local-server, cross-launch cache check
 .venv/bin/pip wheel --no-deps -w /tmp/locus-wheels .
 ```

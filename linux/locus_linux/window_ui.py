@@ -163,8 +163,10 @@ class WindowUiMixin(RoutePanelMixin):
         self.tabs.setVisible(visible)
         if visible:
             self.split.setSizes([self.sidebar_width, max(400, self.split.width() - self.sidebar_width - 4)])
-        self.store.data["settings"]["sidebar_visible"] = visible
-        self.store.save()
+        try:
+            self.store.update_settings(sidebar_visible=visible)
+        except (OSError, ValueError) as error:
+            self.status.setText(f'Could not save sidebar preference: {error}')
         QTimer.singleShot(100, lambda: self.js("map.invalidateSize({pan:false})"))
 
     def map_tab(self):

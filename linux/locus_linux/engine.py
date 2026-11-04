@@ -154,6 +154,20 @@ class Session:
             self.changed(self.snapshot())
         return "Joystick moving." if magnitude else "Holding location."
 
+    def read_record(self):
+        try:
+            record = json.loads(self.journal.read_text())
+            if not isinstance(record, dict) or not isinstance(record.get('device'), str) or not record['device'].strip():
+                raise ValueError('Missing iPhone ownership data')
+            if record.get('transport', 'usb') not in ('usb', 'wifi'):
+                raise ValueError('Unknown recovery transport')
+            return record
+        except FileNotFoundError:
+            return None
+        except (OSError, ValueError) as error:
+            raise RuntimeError(f'Recovery record at {self.journal} could not be read: {error}. '
+                               'Original preserved; repair it before changing or restoring phone location.') from error
+
     def record(self, device, target):
         self.journal.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         temporary = self.journal.with_suffix(".tmp")
@@ -168,8 +182,8 @@ class Session:
         async with self.lock:
             if self.device and self.device != device:
                 raise RuntimeError("Restore the current iPhone before switching devices.")
-            if self.journal.exists():
-                previous = json.loads(self.journal.read_text())
+            previous = self.read_record()
+            if previous is not None:
                 if previous["device"] != device:
                     raise RuntimeError("An unresolved session belongs to another iPhone. Restore it first.")
             # Record uncertainty before a command could reach the device.
@@ -318,8 +332,9 @@ class Session:
     async def restore(self, device):
         async with self.lock:
             owner = self.device
-            if self.journal.exists():
-                owner = json.loads(self.journal.read_text())["device"]
+            previous = self.read_record()
+            if previous is not None:
+                owner = previous['device']
             if owner and owner != device:
                 raise RuntimeError("Select the iPhone that owns the unresolved session.")
             self.target = None

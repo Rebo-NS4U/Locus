@@ -96,10 +96,13 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
             identifier = draft.get('draft_route_id')
             self.active_route_id = identifier if any(item['id'] == identifier for item in draft['routes']) else None
             self.apply_route_document(draft['draft'])
-        if self.route_library.error:
-            self.status.setText(self.route_library.error)
+        if self.state_warnings():
+            self.status.setText(self.state_warnings())
         self.worker.start()
 
+    def state_warnings(self):
+        return ' '.join(error for error in (self.store.error, self.route_library.error,
+                                            self.worker.recovery_error) if error)
 
     def started(self):
         self.ready, self.busy = True, False
@@ -134,8 +137,10 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
         button.clicked.connect(self.setup_dialog.accept)
         layout.addWidget(button)
         def seen():
-            self.store.data["settings"]["setup_seen"] = True
-            self.store.save()
+            try:
+                self.store.update_settings(setup_seen=True)
+            except (OSError, ValueError) as error:
+                self.status.setText(f'Could not save settings: {error}')
         self.setup_dialog.accepted.connect(seen)
         self.setup_dialog.show()
 
@@ -177,7 +182,9 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
             if index >= 0:
                 self.devices.setCurrentIndex(index)
             recovery = self.worker.session.journal.exists()
-            self.status.setText(("Unresolved session: select its iPhone and Restore location. " if recovery else "") +
+            warning = self.state_warnings()
+            self.status.setText((warning + ' ' if warning else '') +
+                ("Unresolved session: select its iPhone and Restore location. " if recovery and not self.worker.recovery_error else "") +
                 ("Select your phone, then Prepare iPhone." if result else "No iPhone found. Connect and unlock it; for Wi-Fi, enable it over USB first and use the same network."))
         elif operation == "search":
             self.populate(self.results, result)
@@ -200,9 +207,13 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
         else:
             self.status.setText(result)
             if operation == "apply" and self.pending_recent:
-                self.store.add("recents", **self.pending_recent)
-                self.refresh_places()
-                self.pending_recent = None
+                try:
+                    self.store.add("recents", **self.pending_recent)
+                    self.refresh_places()
+                except (OSError, ValueError) as error:
+                    self.status.setText(f'{result} Could not save recent place: {error}')
+                finally:
+                    self.pending_recent = None
         if operation == "restore" and self.exit_after_restore:
             self.close()
 
@@ -226,11 +237,10 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
 
     def save_settings(self):
         try:
-            self.store.data["settings"].update(photon=endpoint(self.photon.text().strip()), valhalla=endpoint(self.valhalla.text().strip()),
+            self.store.update_settings(photon=endpoint(self.photon.text().strip()), valhalla=endpoint(self.valhalla.text().strip()),
                 reconnect=self.reconnect.isChecked(), notifications=self.notifications.isChecked(), travel_mode=self.travel_mode.currentText(),
                 motion_revision=1, speed_kph=to_kph(self.speed.value()), variation=self.variation.isChecked(), night_map=self.map_style.currentIndex() == 0, follow=self.follow.isChecked(),
                 traffic_stops=self.traffic_stops.isChecked(), red_probability=self.red_probability.value(), overpass=endpoint(self.overpass.text().strip()))
-            self.store.save()
             self.configure_motion()
             self.status.setText("Settings saved.")
         except (OSError, ValueError) as error:

@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Background phone and routing operations."""
 import asyncio
-import json
 import os
 from pathlib import Path
 from PySide6.QtCore import QThread, Signal
@@ -24,6 +23,7 @@ class Worker(QThread):
     def __init__(self, demo):
         super().__init__()
         self.demo = demo
+        self.recovery_error = None
 
     def run(self):
         self.loop = asyncio.new_event_loop()
@@ -31,10 +31,12 @@ class Worker(QThread):
         self.transport = DemoTransport() if self.demo else IPhoneTransport()
         self.session = Session(self.transport, state_directory() / ("demo-session.json" if self.demo else "session.json"),
                                self.interrupted.emit, self.state_changed.emit)
-        if self.session.journal.exists():
-            saved_mode = json.loads(self.session.journal.read_text()).get("transport", "usb")
-            if saved_mode in ("usb", "wifi"):
-                self.transport.mode = saved_mode
+        try:
+            saved = self.session.read_record()
+            if saved is not None:
+                self.transport.mode = saved.get('transport', 'usb')
+        except RuntimeError as error:
+            self.recovery_error = str(error)
         self.services = Services()
         self.operation_lock = asyncio.Lock()
         self.ready.emit()
