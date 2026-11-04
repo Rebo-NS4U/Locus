@@ -180,6 +180,8 @@ class RouteEditorMixin:
         self.segment_loading = False
         self.select_departure()
         self.selection_editor.setCurrentIndex(0 if self.route_list.currentRow() % 2 == 0 else 1)
+        item = self.route_list.currentItem()
+        self.selection_context.setText(item.text().strip() if item else 'Select a stop or segment in Trip to edit it here.')
         self.redraw_route()
 
     def select_departure(self):

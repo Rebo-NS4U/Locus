@@ -36,6 +36,13 @@ with patch.object(Worker, 'start'):
     first.there_and_back.setChecked(True)
     assert first.route_plan.leg_count == 4
     first.route_list.setCurrentRow(2)
+    first.route_list.itemDoubleClicked.emit(first.route_list.currentItem())
+    assert first.studio_sections.currentIndex() == 1
+    assert 'Stop 02' in first.selection_context.text()
+    first.studio_sections.setCurrentIndex(2)
+    assert first.library_toggle.isChecked()
+    first.library_toggle.setChecked(False)
+    assert first.studio_sections.currentIndex() == 0
     first.departure_mode.setCurrentIndex(first.departure_mode.findData('timer'))
     first.departure_seconds.setValue(90)
     assert first.route_plan.pins[1]['departure'] == {'mode': 'timer', 'seconds': 90}

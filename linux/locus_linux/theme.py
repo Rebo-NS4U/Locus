@@ -1,12 +1,32 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Assistant panel inspired controls using the exported desktop palette."""
 import configparser
+import json
+import math
 import re
 from pathlib import Path
 from PySide6.QtGui import QColor, QFont, QPalette
 
 DEFAULT = {"bg": "#423429", "surface": "#46372a", "raised": "#684e3a", "text": "#efdfd6",
            "muted": "#9e8d82", "accent": "#ffb77e", "on_accent": "#4d2600", "border": "#70543d"}
+
+
+def read_button_style(config=None):
+    """Mirror Quickshell SettingsButton radius and shared shell surface mode."""
+    root = Path(config) if config else Path.home() / '.config'
+    try:
+        value = json.loads((root / 'rebos_shell/config/theme.json').read_text())
+        if not isinstance(value, dict):
+            raise ValueError('Expected a theme object')
+        radius = float(value.get('roundness', 16))
+        if not math.isfinite(radius):
+            raise ValueError('Invalid roundness')
+        mode = value.get('shellStyle', 'glass')
+    except (OSError, ValueError, TypeError):
+        radius, mode = 16, 'glass'
+    # Styling.radius(-4): unified shell styles scale the offset by .35.
+    radius = max(0, min(48, radius) - (4 if mode == 'custom' else 1.4))
+    return {'radius': radius, 'mode': mode}
 
 
 def read_colors(config=None):
@@ -53,9 +73,13 @@ def apply_theme(app, colors=None):
         color = QColor(c[key])
         return f"rgba({color.red()}, {color.green()}, {color.blue()}, {opacity})"
 
+    buttons = read_button_style()
+    colorful = buttons['mode'] == 'colorful'
     style = dict(c, glass=alpha("bg", 190), card=alpha("surface", 145),
                  edge=alpha("text", 28), field=alpha("bg", 130),
-                 hover=mix(c["surface"], c["accent"], .16),
+                 button=mix(c['surface'], c['accent'], .10 if colorful else .035),
+                 button_edge=alpha('border', 76), button_radius=buttons['radius'],
+                 hover=mix(c["surface"], c["accent"], .28 if colorful else .16),
                  pressed=mix(c["surface"], c["accent"], .28),
                  primary_hover=mix(c["accent"], c["text"], .12),
                  disabled=mix(c["surface"], c["bg"], .5))
@@ -67,7 +91,7 @@ def apply_theme(app, colors=None):
         QWidget#statusbar { background: transparent; }
         QWidget#deviceToolbar { background: %(card)s; border-radius: 12px; }
         QWidget#navigationRail { background: %(card)s; border: 1px solid %(edge)s; border-radius: 14px; }
-        QPushButton#navigationItem { text-align: left; padding: 12px 14px; border-radius: 10px; }
+        QPushButton#navigationItem { text-align: left; padding: 12px 14px; }
         QWidget#playbackDock { background: %(card)s; border: 1px solid %(edge)s; border-radius: 14px; }
         QLabel#sectionTitle { color: %(accent)s; font-weight: 700; padding: 4px 8px; }
         QLabel#brand { color: %(accent)s; font-size: 16px; font-weight: 700; padding: 0 8px 0 0; }
@@ -87,11 +111,11 @@ def apply_theme(app, colors=None):
         QProgressBar::chunk { background: %(accent)s; border-radius: 6px; }
         QGroupBox { background: %(card)s; border: 1px solid %(edge)s; border-radius: 18px; margin-top: 14px; padding: 16px 10px 10px; }
         QGroupBox::title { subcontrol-origin: margin; left: 16px; padding: 0 6px; color: %(accent)s; }
-        QPushButton, QToolButton { background: %(card)s; color: %(text)s; border: 1px solid %(edge)s; border-radius: 16px; min-height: 20px; padding: 7px 12px; }
+        QPushButton, QToolButton { background: %(button)s; color: %(text)s; border: 1px solid %(button_edge)s; border-radius: %(button_radius)spx; min-height: 20px; padding: 12px; }
         QPushButton:hover, QToolButton:hover { background: %(hover)s; }
         QPushButton:pressed, QToolButton:pressed { background: %(pressed)s; border-color: %(accent)s; }
         QPushButton:checked, QToolButton:checked { background: %(accent)s; color: %(on_accent)s; border-color: %(accent)s; }
-        QPushButton:focus, QToolButton:focus { border: 1px solid %(accent)s; }
+        QPushButton:focus, QToolButton:focus { border: 2px solid %(accent)s; padding: 11px; }
         QPushButton#primary { background: %(accent)s; color: %(on_accent)s; border-color: %(accent)s; }
         QPushButton#primary:hover, QPushButton:checked:hover, QToolButton:checked:hover { background: %(primary_hover)s; }
         QPushButton#primary:pressed { background: %(primary_hover)s; border-color: %(text)s; }
@@ -100,7 +124,7 @@ def apply_theme(app, colors=None):
         QLineEdit, QDoubleSpinBox, QSpinBox, QTimeEdit, QComboBox, QListWidget, QTextEdit, QPlainTextEdit { background: %(field)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 12px; padding: 6px; selection-background-color: %(accent)s; selection-color: %(on_accent)s; }
         QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus, QComboBox:focus, QListWidget:focus { border-color: %(accent)s; }
         QComboBox QAbstractItemView { background: %(surface)s; color: %(text)s; selection-background-color: %(accent)s; selection-color: %(on_accent)s; border: 1px solid %(border)s; }
-        QListWidget::item { padding: 6px; border-radius: 8px; }
+        QListWidget::item { padding: 10px 12px; border-radius: 8px; }
         QListWidget::item:hover { background: %(hover)s; }
         QListWidget::item:selected { background: %(pressed)s; color: %(text)s; border-left: 3px solid %(accent)s; }
         QTabWidget::pane { border: 0; }

@@ -126,7 +126,7 @@ class WindowUiMixin(RoutePanelMixin):
         split.setHandleWidth(12)
         self.tabs = QTabWidget()
         self.tabs.setObjectName("inspector")
-        self.tabs.setMinimumWidth(360)
+        self.tabs.setMinimumWidth(420)
         self.tabs.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.tabs.setStyleSheet("QTabBar::tab { padding: 7px 6px; }")
         self.tabs.setUsesScrollButtons(False)
@@ -140,23 +140,31 @@ class WindowUiMixin(RoutePanelMixin):
             scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
             scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             widget.setObjectName("inspectorPage")
-            widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            widget.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                 QSizePolicy.Policy.Ignored if title == 'Route' else QSizePolicy.Policy.Preferred)
             scroll.setWidget(widget)
             self.tab_scrolls.append(scroll)
             if title == "Route":
+                # The studio owns scrolling per view; its header and dock stay fixed.
+                scroll.takeWidget()
+                scroll.deleteLater()
+                self.tab_scrolls[-1] = self.studio_sections.widget(0)
                 route_page = QWidget()
                 route_layout = QVBoxLayout(route_page)
                 route_layout.setContentsMargins(0, 0, 0, 0)
                 route_layout.setSpacing(4)
-                route_layout.addWidget(scroll, 1)
+                route_layout.addWidget(widget, 1)
                 route_layout.addWidget(self.route_footer)
                 self.tabs.addTab(route_page, title)
             else:
                 self.tabs.addTab(scroll, title)
         self.sidebar_width = 440
+        self.workspace_widths = {1: 620}
+        self.inspector_index = 0
         self.tabs.hide()
         split.addWidget(self.tabs)
         self.map = QWebEngineView()
+        self.map.setMinimumWidth(280)
         self.map_profile = create_map_profile(self.map, demo=self.demo)
         self.map.setPage(QWebEnginePage(self.map_profile, self.map))
         QApplication.instance().aboutToQuit.connect(self.release_map)
@@ -195,6 +203,8 @@ class WindowUiMixin(RoutePanelMixin):
 
     @property
     def sidebar_scroll(self):
+        if self.tabs.currentIndex() == 1:
+            return self.studio_sections.currentWidget()
         return self.tab_scrolls[self.tabs.currentIndex()]
 
     def open_workspace(self, index):
@@ -204,11 +214,20 @@ class WindowUiMixin(RoutePanelMixin):
     def sync_navigation(self, index):
         for page, button in enumerate(self.navigation_buttons):
             button.setChecked(page == index)
+        if hasattr(self, 'map') and index != self.inspector_index:
+            if self.tabs.isVisible():
+                self.workspace_widths[self.inspector_index] = self.split.sizes()[0]
+            self.inspector_index = index
+            self.sidebar_width = self.workspace_widths.get(index, 440)
+            if self.tabs.isVisible():
+                self.split.setSizes([self.sidebar_width, max(300, self.split.width() - self.sidebar_width - 12)])
+            QTimer.singleShot(100, lambda: self.js('map.invalidateSize({pan:false})'))
 
     def toggle_sidebar(self, visible):
         self.release_keys()
         if not visible and self.tabs.isVisible():
             self.sidebar_width = self.split.sizes()[0]
+            self.workspace_widths[self.tabs.currentIndex()] = self.sidebar_width
         self.tabs.setVisible(visible)
         if visible:
             self.split.setSizes([self.sidebar_width, max(400, self.split.width() - self.sidebar_width - 4)])

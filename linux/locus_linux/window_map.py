@@ -159,7 +159,9 @@ class MapInteractionMixin:
     def refresh_theme(self):
         colors = read_colors()
         config = Path.home() / ".config/qt6ct/qt6ct.conf"
-        stamp = config.stat().st_mtime_ns if config.exists() else 0
+        shell_config = Path.home() / '.config/rebos_shell/config/theme.json'
+        stamp = (config.stat().st_mtime_ns if config.exists() else 0,
+                 shell_config.stat().st_mtime_ns if shell_config.exists() else 0)
         if colors != self.colors or stamp != self.font_stamp:
             self.font_stamp = stamp
             self.colors = apply_theme(QApplication.instance(), colors)

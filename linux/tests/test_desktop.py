@@ -1,14 +1,27 @@
 import configparser
+import json
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
 from locus_linux.install import install_launcher
-from locus_linux.theme import read_colors
+from locus_linux.theme import read_colors, read_button_style
 
 
 class DesktopTests(unittest.TestCase):
+    def test_shell_button_settings_and_invalid_file_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            theme = root / 'rebos_shell/config/theme.json'
+            theme.parent.mkdir(parents=True)
+            theme.write_text(json.dumps({'shellStyle': 'colorful', 'roundness': 16}))
+            self.assertEqual(read_button_style(root), {'radius': 14.6, 'mode': 'colorful'})
+            theme.write_text(json.dumps({'shellStyle': 'custom', 'roundness': 10}))
+            self.assertEqual(read_button_style(root)['radius'], 6)
+            theme.write_text('{invalid')
+            self.assertEqual(read_button_style(root), {'radius': 14.6, 'mode': 'glass'})
+
     def test_theme_reads_active_desktop_palette_and_updates(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

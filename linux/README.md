@@ -9,13 +9,22 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 - A persistent navigation rail opens Places, Routes, Movement, Map and Settings.
   Phone selection and device tools have their own toolbar below the location actions.
   Each workspace has a heading and a short description of its controls.
-- Route studio groups trip options with stops, switches between Stop timing and
-  Travel & speed for the selected row, and keeps Plan & playback in a fixed dock.
-  The library opens as a dedicated view within the route workspace; Route ⋯ groups
-  file actions beside Save, Open library and New. Timer values and units share one
+- Route studio opens wider than the other workspaces and remembers each workspace's
+  panel width. Trip, Details and Library have separate views and scroll areas;
+  the route name, Save, file menu and playback dock stay fixed. Trip gives its
+  available space to the stop list. Double-click a row to open timing or travel
+  settings in Details. New route and file actions live in Route ⋯.
+  Its Trip options section contains There and back, Loop route and Show return stops.
+  Short windows collapse the studio heading to leave more editing space.
+  Timer values and units share one
   row, with seconds, minutes, hours and days supported (up to seven days).
   Show return stops exposes the reverse sequence; these stops still share their
   locations and departure rules with the corresponding outbound stops.
+- Buttons follow Quickshell's settings-control proportions, tinted fills, hover
+  states and focus border. Corner rounding and surface mode read from
+  `~/.config/rebos_shell/config/theme.json`, with safe defaults when unavailable.
+  Palette and font continue to follow the Qt6ct export. Shell button settings
+  refresh while Locus is open; Quickshell configuration is only read.
 - Glass desktop redesign with a translucent rounded shell, inset action bar,
   soft sidebar cards, pill controls, slim scrollbars and frosted map overlays.
   Native window transparency uses the compositor’s background blur when enabled
