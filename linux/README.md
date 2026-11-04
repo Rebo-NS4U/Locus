@@ -58,6 +58,12 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   default), with 8–65 second waits. Driving brakes before the control and restarts
   smoothly while fixed-location refresh continues through the wait. Signal phases
   and durations are simulated, not live traffic data.
+- A built-in route library with named saves, search, open, rename and delete.
+  Save updates the current route; **Save a copy to library** keeps a separate copy.
+  Walking/driving/cycling settings and imported GPX tracks are retained. The current
+  working draft is saved automatically and restored on launch, without starting playback.
+- A refreshed map-first route editor with a visible route name and Save action,
+  a separate library view, quieter selection colors and always-reachable playback controls.
 - Colored, clickable segments with automatic path selection. Editable
   `.locus.json` projects retain stops, travel modes and speeds. Loading an older
   project discards manual shape hints so routing is automatic.
@@ -134,6 +140,14 @@ Search, saved places and coordinate fields select coordinates without adding rou
 pins. Map clicks do not send phone commands. **Set location** sends it to the selected phone. Check the result in Maps.
 Use Move for joystick/imported-GPX speed controls. On Route, add or drag pins,
 choose **Walking**, **Driving** or **Cycling** for each segment, then **Plan route**.
+Name the route and press **Save route** (Ctrl+S) to keep it inside Locus.
+**Saved routes** opens your searchable library; double-click a route or press
+**Open** to restore it. Rename and delete are available there. Opening editable
+routes restores their stops and settings; Plan route rebuilds paths with current
+map data. GPX tracks reopen with their exact geometry. The last working draft is
+restored automatically on startup. File import/export remains in **Route ⋯**.
+The library is stored privately in `$XDG_STATE_HOME/locus-linux/routes.json`
+(default `~/.local/state/locus-linux/routes.json`); demo mode uses a separate library.
 Walking considers mapped sidewalks, trails, driveways and alleys with pedestrian
 access, including on short legs, and selects the shortest returned alternative. When the
 router finds no walking connection, legs up to 300 metres (984 ft) can connect
@@ -206,6 +220,7 @@ Demo mode uses separate files. These personal files are never included in Git.
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/pip check
 .venv/bin/python tests/smoke_ui.py  # requires a graphical session
+.venv/bin/python tests/smoke_library.py  # GUI route-library recovery and GPX saves
 .venv/bin/python tests/smoke_map_cache.py  # local-server, cross-launch cache check
 .venv/bin/pip wheel --no-deps -w /tmp/locus-wheels .
 ```

@@ -65,7 +65,9 @@ def apply_theme(app, colors=None):
         QWidget#shell { background: %(glass)s; border: 1px solid %(edge)s; border-radius: 22px; }
         QWidget#toolbar { background: %(card)s; border: 1px solid %(edge)s; border-radius: 18px; }
         QWidget#statusbar { background: transparent; }
-        QLabel#brand { color: %(accent)s; padding: 0 8px 0 0; }
+        QLabel#brand { color: %(accent)s; font-size: 16px; font-weight: 700; padding: 0 8px 0 0; }
+        QLabel#pageTitle { font-size: 23px; font-weight: 700; padding-top: 8px; padding-bottom: 3px; }
+        QLineEdit#routeName { font-size: 16px; font-weight: 600; padding: 10px; border-color: %(edge)s; }
         QTabWidget#inspector { background: %(card)s; border: 1px solid %(edge)s; border-radius: 18px; padding: 8px; }
         QWidget#inspectorPage, QScrollArea, QScrollArea > QWidget > QWidget { background: transparent; }
         QLabel { color: %(text)s; background: transparent; }
@@ -78,7 +80,7 @@ def apply_theme(app, colors=None):
         QSlider::handle:horizontal { background: %(accent)s; width: 14px; margin: -5px 0; border-radius: 7px; }
         QProgressBar { background: %(field)s; border: 0; border-radius: 6px; text-align: center; color: %(text)s; }
         QProgressBar::chunk { background: %(accent)s; border-radius: 6px; }
-        QGroupBox { background: %(card)s; border: 1px solid %(edge)s; border-radius: 16px; margin-top: 16px; padding: 18px 12px 12px; }
+        QGroupBox { background: %(card)s; border: 1px solid %(edge)s; border-radius: 18px; margin-top: 14px; padding: 16px 10px 10px; }
         QGroupBox::title { subcontrol-origin: margin; left: 16px; padding: 0 6px; color: %(accent)s; }
         QPushButton, QToolButton { background: %(card)s; color: %(text)s; border: 1px solid %(edge)s; border-radius: 16px; min-height: 20px; padding: 7px 12px; }
         QPushButton:hover, QToolButton:hover { background: %(hover)s; }
@@ -95,7 +97,7 @@ def apply_theme(app, colors=None):
         QComboBox QAbstractItemView { background: %(surface)s; color: %(text)s; selection-background-color: %(accent)s; selection-color: %(on_accent)s; border: 1px solid %(border)s; }
         QListWidget::item { padding: 6px; border-radius: 8px; }
         QListWidget::item:hover { background: %(hover)s; }
-        QListWidget::item:selected { background: %(accent)s; color: %(on_accent)s; }
+        QListWidget::item:selected { background: %(pressed)s; color: %(text)s; border-left: 3px solid %(accent)s; }
         QTabWidget::pane { border: 0; }
         QTabBar::tab { background: transparent; color: %(muted)s; padding: 8px 12px; border: 1px solid transparent; border-radius: 12px; margin: 2px; }
         QTabBar::tab:hover { background: %(hover)s; color: %(text)s; }

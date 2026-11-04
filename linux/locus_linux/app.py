@@ -10,7 +10,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QThread, QUrl, Signal, Slot, Qt, QLockFile, QTimer, QEvent
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QComboBox, QDoubleSpinBox, QMessageBox, QLineEdit, QListWidget,
+    QLabel, QPushButton, QListWidgetItem, QComboBox, QDoubleSpinBox, QMessageBox, QLineEdit, QListWidget,
     QTabWidget, QGroupBox, QCheckBox, QSplitter, QFileDialog, QInputDialog,
     QSystemTrayIcon, QScrollArea, QGridLayout, QDialog, QSizePolicy, QToolButton, QMenu)
 from PySide6.QtWebChannel import QWebChannel
@@ -23,6 +23,7 @@ from .engine import Session, DemoTransport
 from .device import IPhoneTransport
 from .routes import SPEEDS, Route, parse_gpx, export_gpx
 from .storage import Places
+from .library import RouteLibrary
 from .services import Services, PHOTON, VALHALLA, OVERPASS, endpoint
 from .theme import apply_theme, read_colors
 from .units import to_mph, to_kph, speed_text, METRES_PER_MILE
@@ -134,6 +135,9 @@ class Window(QMainWindow):
         self.pending_operation = None
         self.stops, self.route_points, self.alternatives = [], [], []
         self.route_plan = RoutePlan()
+        self.route_library = RouteLibrary(state_directory() / ('demo-routes.json' if demo else 'routes.json'))
+        self.active_route_id = None
+        self.restoring_route = False
         self.route_profile = None
         self.planning_revision = None
         self.planning_document = None
@@ -174,6 +178,14 @@ class Window(QMainWindow):
         self.map.installEventFilter(self)
         QApplication.instance().focusChanged.connect(self.focus_changed)
         self.enable(False)
+        if self.route_library.data.get('draft'):
+            draft = dict(self.route_library.data)
+            self.route_title.setText(draft.get('draft_name') or 'Recovered draft')
+            identifier = draft.get('draft_route_id')
+            self.active_route_id = identifier if any(item['id'] == identifier for item in draft['routes']) else None
+            self.apply_route_document(draft['draft'])
+        if self.route_library.error:
+            self.status.setText(self.route_library.error)
         self.worker.start()
 
     def button(self, label, callback, layout, foreground=False):
@@ -392,11 +404,56 @@ class Window(QMainWindow):
         box = QVBoxLayout(page)
         box.setContentsMargins(4, 0, 4, 4)
         box.setSpacing(6)
-        stops_box = self.group("Route stops & segments", box)
-        stops_box.addWidget(QLabel("Click the map to add a route pin"))
+        heading = QLabel('Build your next route')
+        heading.setObjectName('pageTitle')
+        box.addWidget(heading)
+        hint = QLabel('Choose your stops. Let Locus find the way.')
+        hint.setObjectName('subtitle')
+        hint.setWordWrap(True)
+        box.addWidget(hint)
+        self.route_title = QLineEdit()
+        self.route_title.setPlaceholderText('Name this route…')
+        self.route_title.setAccessibleName('Route name')
+        self.route_title.setObjectName('routeName')
+        self.route_title.editingFinished.connect(self.remember_route_draft)
+        box.addWidget(self.route_title)
+        actions = QHBoxLayout()
+        self.button('Save route', self.save_library_route, actions).setObjectName('primary')
+        self.library_toggle = QPushButton('Saved routes')
+        self.library_toggle.setCheckable(True)
+        actions.addWidget(self.library_toggle)
+        self.button('New', self.new_library_route, actions)
+        box.addLayout(actions)
+        self.library_panel = QGroupBox('Your library')
+        library_layout = QVBoxLayout(self.library_panel)
+        self.route_search = QLineEdit()
+        self.route_search.setPlaceholderText('Find a saved route…')
+        self.route_search.textChanged.connect(self.refresh_route_library)
+        library_layout.addWidget(self.route_search)
+        self.library_list = QListWidget()
+        self.library_list.setMinimumHeight(200)
+        self.library_list.setMaximumHeight(300)
+        self.library_list.itemDoubleClicked.connect(lambda item: self.open_library_route())
+        library_layout.addWidget(self.library_list)
+        self.library_empty = QLabel('Save a route to keep it here.')
+        self.library_empty.setObjectName('subtitle')
+        self.library_empty.setWordWrap(True)
+        library_layout.addWidget(self.library_empty)
+        library_actions = QHBoxLayout()
+        self.button('Open', self.open_library_route, library_actions)
+        self.button('Rename', self.rename_library_route, library_actions)
+        self.button('Delete', self.delete_library_route, library_actions)
+        library_layout.addLayout(library_actions)
+        self.library_toggle.toggled.connect(self.library_panel.setVisible)
+        self.library_panel.hide()
+        box.addWidget(self.library_panel)
+        self.refresh_route_library()
+        stops_box = self.group("Stops", box)
+        stops_box.addWidget(QLabel("Click the map to add a stop"))
+        self.route_stop_card = stops_box.parentWidget()
         self.route_list = QListWidget()
-        self.route_list.setFixedHeight(176)
-        self.route_list.setToolTip("Stops and their connecting segments in route order. Select a stop to insert, remove or reorder it; select a segment to edit its shape and speed.")
+        self.route_list.setFixedHeight(210)
+        self.route_list.setToolTip("Stops and their connecting segments in route order. Select a stop to insert, remove or reorder it; select a segment to choose Walking, Driving or Cycling.")
         self.route_list.currentRowChanged.connect(lambda: self.select_segment(self.selected_segment()))
         stops_box.addWidget(self.route_list)
         row = QHBoxLayout()
@@ -415,7 +472,7 @@ class Window(QMainWindow):
             button.clicked.connect(lambda checked=False, step=direction: self.reorder_stop(step))
             row.addWidget(button)
         stops_box.addLayout(row)
-        self.segment_group = QGroupBox("Travel mode & speed")
+        self.segment_group = QGroupBox("Travel between stops")
         editor = QVBoxLayout(self.segment_group)
         editor.addWidget(QLabel("Travel mode"))
         self.segment_travel = QComboBox()
@@ -453,6 +510,13 @@ class Window(QMainWindow):
         note.setWordWrap(True)
         note.setObjectName("subtitle")
         box.addWidget(note)
+        self.library_toggle.toggled.connect(lambda visible: self.route_stop_card.setVisible(not visible))
+        self.library_toggle.toggled.connect(lambda visible: self.segment_group.setVisible(not visible))
+        self.library_toggle.toggled.connect(lambda visible: note.setVisible(not visible))
+        self.library_toggle.toggled.connect(lambda visible: heading.setText('Your route library' if visible else 'Build your next route'))
+        self.library_toggle.toggled.connect(lambda visible: hint.setText('Saved locally. Ready for your next trip.' if visible else 'Choose your stops. Let Locus find the way.'))
+        self.save_route_shortcut = QShortcut(QKeySequence.StandardKey.Save, self)
+        self.save_route_shortcut.activated.connect(self.save_library_route)
         # Keep planning and playback reachable while the editor scrolls.
         self.route_footer = QWidget()
         footer = QVBoxLayout(self.route_footer)
@@ -461,15 +525,17 @@ class Window(QMainWindow):
         row = QHBoxLayout()
         self.plan_button = self.button("Plan route", self.plan_route, row)
         self.plan_button.setObjectName("primary")
+        self.plan_button.setEnabled(False)
         self.plan_button.setToolTip("Choose paths automatically for each segment’s travel mode")
         self.route_file_button = QToolButton()
         self.route_file_button.setText("Route ⋯")
         self.route_file_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.route_menu = QMenu(self.route_file_button)
         for label, callback in [("Import GPX…", self.import_gpx), ("Export GPX…", self.export_gpx),
-                                ("Load project…", self.load_project), ("Save project…", self.save_project)]:
+                                ("Load project…", self.load_project), ("Export project…", self.save_project)]:
             self.route_menu.addAction(label, callback)
         self.route_menu.addSeparator()
+        self.route_menu.addAction("Save a copy to library", lambda: self.save_library_route(as_copy=True))
         self.route_menu.addAction("Clear route", self.clear_route)
         self.route_file_button.setMenu(self.route_menu)
         row.addWidget(self.route_file_button)
@@ -924,6 +990,7 @@ class Window(QMainWindow):
         if selected_row is None:
             selected_row = max(0, self.route_list.currentRow())
         self.stops = self.route_plan.points
+        self.plan_button.setEnabled(len(self.stops) >= 2)
         self.imported_track = False
         if select_newest:
             selected_row = max(0, 2 * len(self.stops) - 3)
@@ -934,12 +1001,13 @@ class Window(QMainWindow):
             if i < len(self.stops) - 1:
                 spec = self.route_plan.spec(i)
                 ready = bool(self.route_plan.results.get(self.route_plan.key(i)))
-                self.route_list.addItem(f"    {i + 1} → {i + 2} · {PROFILES[spec['profile']]['label']} · {'ready' if ready else 'needs plan'}")
+                self.route_list.addItem(f"    {i + 1} → {i + 2} · {travel_mode(spec['profile'])} · {'ready' if ready else 'needs plan'}")
         if self.route_list.count():
             self.route_list.setCurrentRow(min(selected_row, self.route_list.count() - 1))
         self.route_list.blockSignals(False)
         self.select_segment(self.selected_segment())
         self.rebuild_route()
+        self.remember_route_draft()
 
     def change_segment_travel(self, *unused):
         if not self.segment_loading:
@@ -1014,7 +1082,7 @@ class Window(QMainWindow):
             self.route_profile = combined
             self.show_route_summary("Mixed route")
         except ValueError:
-            self.route_summary.setText("Choose a profile for each segment, then Plan segments.")
+            self.route_summary.setText(f"{len(self.stops)} stops · ready to plan" if len(self.stops) >= 2 else "Add at least two stops to build a route.")
             self.redraw_route()
 
     def redraw_route(self):
@@ -1054,6 +1122,131 @@ class Window(QMainWindow):
         self.configure_motion()
         self.request("start_route", self.devices.currentData(), self.route_points.copy(), self.loop_route.isChecked(), self.route_profile)
 
+    def current_route_document(self):
+        if self.imported_track:
+            return {'format': 'locus-track', 'version': 1, 'points': self.route_points.copy()}
+        return self.route_plan.serialize()
+
+    def remember_route_draft(self):
+        if self.restoring_route:
+            return
+        try:
+            self.route_library.save_draft(self.current_route_document(), self.route_title.text(), self.active_route_id)
+        except (OSError, ValueError) as error:
+            self.status.setText(f'Could not save draft: {error}')
+
+    def refresh_route_library(self, *unused):
+        selected = self.library_list.currentItem()
+        identifier = selected.data(Qt.ItemDataRole.UserRole) if selected else self.active_route_id
+        self.library_list.clear()
+        query = self.route_search.text().strip().casefold()
+        for entry in self.route_library.data['routes']:
+            if query not in entry['name'].casefold():
+                continue
+            value = entry['document']
+            detail = f"{len(value['points'])} track points" if value['format'] == 'locus-track' else f"{len(value['pins'])} stops · editable route"
+            item = QListWidgetItem(entry['name'] + '\n' + detail)
+            item.setData(Qt.ItemDataRole.UserRole, entry['id'])
+            self.library_list.addItem(item)
+            if entry['id'] == identifier:
+                self.library_list.setCurrentItem(item)
+        self.library_empty.setVisible(self.library_list.count() == 0)
+        self.library_empty.setText('No routes match your search.' if query else 'Save a route to keep it here.')
+        if self.library_list.count() and self.library_list.currentRow() < 0:
+            self.library_list.setCurrentRow(0)
+
+    def save_library_route(self, checked=False, *, as_copy=False):
+        try:
+            name = self.route_title.text().strip()
+            if not name or as_copy:
+                name, accepted = QInputDialog.getText(self, 'Save route', 'Route name:', text=name + (' copy' if as_copy and name else ''))
+                if not accepted:
+                    return
+            identifier = self.route_library.save_route(name, self.current_route_document(), None if as_copy else self.active_route_id)
+            self.active_route_id = identifier
+            self.route_title.setText(name)
+            self.refresh_route_library()
+            self.remember_route_draft()
+            self.status.setText(f'Saved “{name}” to your route library.')
+        except (OSError, ValueError, StopIteration) as error:
+            self.status.setText(f'Could not save route: {error}')
+
+    def apply_route_document(self, value):
+        self.restoring_route = True
+        try:
+            if value['format'] == 'locus-track':
+                points = Route(value['points']).points
+                self.route_plan.reset([points[0], points[-1]])
+                self.stops_changed()
+                self.route_points, self.route_profile, self.imported_track = points, None, True
+                self.show_route_summary('Saved track')
+            else:
+                plan = RoutePlan.deserialize(value) if len(value['pins']) >= 2 else RoutePlan()
+                if len(value['pins']) == 1:
+                    plan.add(value['pins'][0]['point'])
+                for index in range(len(plan.pins) - 1):
+                    plan.update(index, {**plan.spec(index), 'controls': []})
+                self.route_plan = plan
+                self.stops_changed()
+        finally:
+            self.restoring_route = False
+        self.remember_route_draft()
+
+    def open_library_route(self, *unused):
+        item = self.library_list.currentItem()
+        if not item or not self.editable_route():
+            return
+        try:
+            entry = self.route_library.get(item.data(Qt.ItemDataRole.UserRole))
+            self.apply_route_document(entry['document'])
+            self.active_route_id = entry['id']
+            self.route_title.setText(entry['name'])
+            self.remember_route_draft()
+            self.library_toggle.setChecked(False)
+            self.js('fitRoute()')
+            self.status.setText('Route opened. Plan route to refresh the paths, then Start when ready.')
+        except (OSError, ValueError, KeyError, StopIteration) as error:
+            self.status.setText(f'Could not open route: {error}')
+
+    def rename_library_route(self, *unused):
+        item = self.library_list.currentItem()
+        if item:
+            identifier = item.data(Qt.ItemDataRole.UserRole)
+            entry = self.route_library.get(identifier)
+            name, accepted = QInputDialog.getText(self, 'Rename route', 'Route name:', text=entry['name'])
+            if accepted:
+                try:
+                    self.route_library.rename(identifier, name)
+                    if self.active_route_id == identifier:
+                        self.route_title.setText(name.strip())
+                        self.remember_route_draft()
+                    self.refresh_route_library()
+                except (OSError, ValueError) as error:
+                    self.status.setText(str(error))
+
+    def delete_library_route(self, *unused):
+        item = self.library_list.currentItem()
+        if item:
+            identifier = item.data(Qt.ItemDataRole.UserRole)
+            entry = self.route_library.get(identifier)
+            if QMessageBox.question(self, 'Delete saved route', f'Delete “{entry["name"]}” from your library?') != QMessageBox.StandardButton.Yes:
+                return
+            try:
+                self.route_library.delete(identifier)
+                if self.active_route_id == identifier:
+                    self.active_route_id = None
+                    self.remember_route_draft()
+                self.refresh_route_library()
+            except (OSError, ValueError) as error:
+                self.status.setText(str(error))
+
+    def new_library_route(self, *unused):
+        if self.editable_route():
+            self.active_route_id = None
+            self.route_title.clear()
+            self.clear_route()
+            self.library_toggle.setChecked(False)
+
     def save_project(self):
         try:
             if self.imported_track:
@@ -1080,6 +1273,8 @@ class Window(QMainWindow):
                 # Old shape hints must not constrain automatic path selection.
                 for index in range(len(plan.pins) - 1):
                     plan.update(index, {**plan.spec(index), "controls": []})
+                self.active_route_id = None
+                self.route_title.setText(Path(path).stem)
                 self.route_plan = plan
                 self.stops_changed()
                 self.status.setText("Route project loaded. Plan segments to rebuild the paths.")
@@ -1095,11 +1290,14 @@ class Window(QMainWindow):
                 if Path(path).stat().st_size > 8_000_000:
                     raise ValueError("GPX is too large (8 MB limit).")
                 points = parse_gpx(Path(path).read_bytes())
+                self.active_route_id = None
+                self.route_title.setText(Path(path).stem)
                 self.route_plan.reset([points[0], points[-1]])
                 self.stops_changed()
                 self.route_points = points
                 self.route_profile = None
                 self.imported_track = True
+                self.remember_route_draft()
                 self.show_route_summary("Imported GPX")
                 self.js("fitRoute()")
             except (OSError, ValueError, KeyError, ET.ParseError) as error:

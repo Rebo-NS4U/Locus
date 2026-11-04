@@ -251,6 +251,37 @@ def check():
             assert abs(window.route_plan.spec(2)['speed_kph'] - to_kph(12)) < .0001
             assert 'mph' in window.segment_info.text()
             assert 'km/h' not in window.segment_info.text()
+            window.route_title.setText('Campus loop')
+            window.save_library_route()
+            identifier = window.active_route_id
+            assert identifier and len(window.route_library.data['routes']) == 1
+            window.save_library_route()
+            assert len(window.route_library.data['routes']) == 1, 'Save updates the current library route'
+            window.library_toggle.setChecked(True)
+            window.route_search.setText('not a match')
+            assert window.library_list.count() == 0
+            window.route_search.setText('campus')
+            assert window.library_list.count() == 1
+            with patch.object(QInputDialog, 'getText', return_value=('Campus commute', True)):
+                window.rename_library_route()
+            window.new_library_route()
+            assert not window.stops
+            window.open_library_route()
+            assert len(window.stops) == 4
+            assert window.route_title.text() == 'Campus commute'
+            assert window.active_route_id == identifier
+            from locus_linux.library import RouteLibrary
+            persisted = RouteLibrary(window.route_library.path)
+            assert persisted.data['draft_route_id'] == identifier
+            assert persisted.data['draft_name'] == 'Campus commute'
+            assert len(persisted.data['draft']['pins']) == 4
+            window.tabs.setCurrentIndex(1)
+            window.library_toggle.setChecked(True)
+            app.processEvents()
+            window.grab().save('/tmp/locus-modern-library.png')
+            window.library_toggle.setChecked(False)
+            app.processEvents()
+            window.grab().save('/tmp/locus-modern-editor.png')
             with patch.object(QFileDialog, 'getSaveFileName', return_value=(str(project), '')):
                 window.save_project()
             assert project.exists()
