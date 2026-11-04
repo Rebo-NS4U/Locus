@@ -294,7 +294,8 @@ def main():
         return 1
     window = Window(options.demo)
     window.activation_server = listen_for_activation(activation_name, window)
-    window.showFullScreen()
+    window.setGeometry(window.screen().availableGeometry())
+    window.show()
     return app.exec()
 
 

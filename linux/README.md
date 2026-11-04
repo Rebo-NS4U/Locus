@@ -6,8 +6,9 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 
 ## Features
 
-- Opens fullscreen on launch. Press **F11** to switch between fullscreen and a
-  normal window; activating an existing instance preserves its window mode.
+- Opens as a normal window sized to the desktop's available area, leaving room
+  for desktop panels. Press **F11** for optional fullscreen; activating an existing
+  instance preserves its window mode.
 - A compact workspace menu in the top toolbar opens Places, Routes, Movement,
   Map and Settings without reserving a vertical navigation column.
   Phone selection and device tools have their own toolbar below the location actions.
@@ -315,7 +316,7 @@ libraries and `desktop-file-utils` are still required, as in CI.
 .venv/bin/pip check
 .venv/bin/python tests/smoke_ui.py  # requires a graphical session
 .venv/bin/python tests/smoke_library.py  # GUI route-library recovery and GPX saves
-.venv/bin/python tests/smoke_startup.py  # fullscreen launch and F11, with fake hardware
+.venv/bin/python tests/smoke_startup.py  # desktop-sized normal launch and F11, with fake hardware
 .venv/bin/python tests/smoke_recovery.py  # corrupt state, visible errors and safe shutdown
 .venv/bin/python tests/smoke_map_cache.py  # local-server, cross-launch cache check
 .venv/bin/pip wheel --no-deps -w /tmp/locus-wheels .

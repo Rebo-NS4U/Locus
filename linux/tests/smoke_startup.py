@@ -17,11 +17,13 @@ def check_launch():
     app = QApplication.instance()
     app.processEvents()
     window = next(widget for widget in app.topLevelWidgets() if isinstance(widget, Window))
-    assert window.isFullScreen(), 'Normal launches must open fullscreen'
+    assert not window.isFullScreen() and not window.isMaximized(), 'Launch as a normal window'
+    expected_size = window.screen().availableGeometry().size().expandedTo(window.minimumSize())
+    assert window.size() == expected_size, 'Fill the available desktop area, respecting minimum size'
+    window.fullscreen_shortcut.activated.emit()
+    assert window.isFullScreen(), 'F11 must still support optional fullscreen'
     window.fullscreen_shortcut.activated.emit()
     assert not window.isFullScreen(), 'F11 must restore a normal window'
-    window.fullscreen_shortcut.activated.emit()
-    assert window.isFullScreen(), 'F11 must reenter fullscreen'
     window.activation_server.close()
     window.release_map()
     window.close()
@@ -31,4 +33,4 @@ def check_launch():
 with patch.object(Worker, 'start'), patch.object(sys, 'argv', ['locus-linux', '--demo']), \
         patch.object(QApplication, 'exec', side_effect=check_launch):
     assert main() == 0
-print('PASS: normal entrypoint opens fullscreen; F11 toggles window state without phone commands')
+print('PASS: startup fills the available desktop as a normal window; optional F11 toggle works')
