@@ -33,10 +33,10 @@ class RouteStudioPage(QWidget):
         self.heading.setVisible(not compact)
         self.trip_hint.setVisible(not compact)
         self.layout().setSpacing(8 if compact else 16)
-        orientation = Qt.Orientation.Horizontal if event.size().width() >= 700 else Qt.Orientation.Vertical
+        orientation = Qt.Orientation.Horizontal if event.size().width() >= 660 else Qt.Orientation.Vertical
         if self.editor_split.orientation() != orientation:
             self.editor_split.setOrientation(orientation)
-            self.editor_split.setSizes([240, 300] if orientation == Qt.Orientation.Vertical else [340, 420])
+            self.editor_split.setSizes([240, 300] if orientation == Qt.Orientation.Vertical else [250, 440])
 
 
 class RoutePanelMixin:
@@ -121,20 +121,19 @@ class RoutePanelMixin:
         stops_box.addWidget(self.route_list, 1)
         row = QHBoxLayout()
         row.setSpacing(8)
-        for label, callback, tip in [
-                ('Add', self.add_stop, 'Append the selected map coordinates'),
-                ('Insert', self.insert_stop, 'Insert after the selected stop'),
-                ('Remove', self.remove_stop, 'Remove the selected stop')]:
-            self.button(label, callback, row).setToolTip(tip)
+        self.button('Add stop', self.add_stop, row).setToolTip('Append the selected map coordinates')
+        stop_actions = QToolButton()
+        stop_actions.setText('Edit ⋯')
+        stop_actions.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        stop_menu = QMenu(stop_actions)
+        stop_menu.addAction('Insert after selected stop', self.insert_stop)
+        stop_menu.addAction('Remove selected stop', self.remove_stop)
+        stop_menu.addSeparator()
+        stop_menu.addAction('Move stop up', lambda: self.reorder_stop(-1))
+        stop_menu.addAction('Move stop down', lambda: self.reorder_stop(1))
+        stop_actions.setMenu(stop_menu)
+        row.addWidget(stop_actions)
         row.addStretch()
-        for label, direction in [('↑', -1), ('↓', 1)]:
-            button = QToolButton()
-            button.setText(label)
-            button.setMinimumWidth(38)
-            button.setToolTip('Move selected stop ' + ('up' if direction < 0 else 'down'))
-            button.setAccessibleName(button.toolTip())
-            button.clicked.connect(lambda checked=False, step=direction: self.reorder_stop(step))
-            row.addWidget(button)
         stops_box.addLayout(row)
 
         details = QWidget()
@@ -333,24 +332,26 @@ class RoutePanelMixin:
         self.route_list.addItem(item)
         card = QFrame()
         card.setObjectName('stopCard')
-        row = QHBoxLayout(card)
-        row.setContentsMargins(12, 12, 12, 12)
-        row.setSpacing(12)
+        content = QVBoxLayout(card)
+        content.setContentsMargins(10, 10, 10, 10)
+        content.setSpacing(5)
+        heading = QHBoxLayout()
+        heading.setSpacing(8)
         badge = QLabel(f'{number:02d}')
         badge.setObjectName('stopBadge')
         badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        badge.setFixedSize(36, 36)
-        row.addWidget(badge, 0, Qt.AlignmentFlag.AlignTop)
-        content = QVBoxLayout()
-        content.setSpacing(5)
-        for value, role in [(title, 'stopTitle'), (coordinate, 'subtitle'),
-                            (timing, 'subtitle'), (onward, 'stopLeg')]:
+        badge.setFixedSize(28, 28)
+        heading.addWidget(badge)
+        title_label = QLabel(title)
+        title_label.setObjectName('stopTitle')
+        heading.addWidget(title_label, 1)
+        content.addLayout(heading)
+        for value, role in [(timing, 'subtitle'), (onward, 'stopLeg')]:
             label = QLabel(value)
             label.setObjectName(role)
             label.setWordWrap(True)
-            label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
             content.addWidget(label)
-        row.addLayout(content, 1)
+        card.setToolTip(text)
         card.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        item.setSizeHint(QSize(0, 154))
+        item.setSizeHint(QSize(0, 122))
         self.route_list.setItemWidget(item, card)

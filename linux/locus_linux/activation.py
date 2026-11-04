@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Ask an existing instance to show its window without touching phone state."""
+from PySide6.QtCore import Qt
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
 
@@ -23,7 +24,8 @@ def listen_for_activation(name, window):
             socket = server.nextPendingConnection()
             socket.disconnectFromServer()
             socket.deleteLater()
-        window.showNormal()
+        window.setWindowState(window.windowState() & ~Qt.WindowState.WindowMinimized)
+        window.show()
         window.raise_()
         window.activateWindow()
         if window.windowHandle():

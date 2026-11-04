@@ -27,3 +27,16 @@ class ActivationTests(unittest.TestCase):
             finally:
                 server.close()
                 window.close()
+
+    def test_repeated_launch_preserves_fullscreen(self):
+        with tempfile.TemporaryDirectory() as directory:
+            window = QWidget()
+            server = listen_for_activation(directory + '/fullscreen', window)
+            try:
+                window.showFullScreen()
+                self.assertTrue(activate_existing(directory + '/fullscreen'))
+                self.app.processEvents()
+                self.assertTrue(window.isFullScreen())
+            finally:
+                server.close()
+                window.close()

@@ -60,6 +60,8 @@ class WindowUiMixin(RoutePanelMixin):
         header.addWidget(self.sidebar_toggle)
         self.sidebar_shortcut = QShortcut(QKeySequence("Ctrl+B"), self)
         self.sidebar_shortcut.activated.connect(self.sidebar_toggle.toggle)
+        self.fullscreen_shortcut = QShortcut(QKeySequence('F11'), self)
+        self.fullscreen_shortcut.activated.connect(self.toggle_fullscreen)
         self.connection_badge = StatusLabel("Not connected")
         self.connection_badge.setFixedWidth(240)
         self.connection = QComboBox()
@@ -157,7 +159,7 @@ class WindowUiMixin(RoutePanelMixin):
             else:
                 self.tabs.addTab(scroll, title)
         self.sidebar_width = 440
-        self.workspace_widths = {1: 860}
+        self.workspace_widths = {1: 740}
         self.inspector_index = 0
         self.tabs.hide()
         split.addWidget(self.tabs)
@@ -205,6 +207,12 @@ class WindowUiMixin(RoutePanelMixin):
             return (self.editor_split.widget(1) if self.studio_sections.currentIndex() == 0
                     else self.studio_sections.currentWidget())
         return self.tab_scrolls[self.tabs.currentIndex()]
+
+    def toggle_fullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
 
     def open_workspace(self, index):
         self.tabs.setCurrentIndex(index)

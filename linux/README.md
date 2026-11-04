@@ -6,12 +6,16 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 
 ## Features
 
+- Opens fullscreen on launch. Press **F11** to switch between fullscreen and a
+  normal window; activating an existing instance preserves its window mode.
 - A compact workspace menu in the top toolbar opens Places, Routes, Movement,
   Map and Settings without reserving a vertical navigation column.
   Phone selection and device tools have their own toolbar below the location actions.
   Each workspace has a heading and a short description of its controls.
 - Route studio combines stop cards and their settings in one resizable workspace.
-  Each card shows its numbered stop, coordinates, wait rule and onward leg.
+  Compact cards show each numbered stop, wait rule and onward leg. Hover a card
+  for its coordinates and full details. Add stop stays visible; Edit ⋯ groups
+  insert, remove and reorder actions. The studio defaults to 740 pixels wide.
   Selecting a card updates its departure and onward travel controls alongside
   the trip. The final stop has no onward leg. Library remains a separate view.
   The studio opens wider than other workspaces and remembers its width; on
@@ -311,6 +315,7 @@ libraries and `desktop-file-utils` are still required, as in CI.
 .venv/bin/pip check
 .venv/bin/python tests/smoke_ui.py  # requires a graphical session
 .venv/bin/python tests/smoke_library.py  # GUI route-library recovery and GPX saves
+.venv/bin/python tests/smoke_startup.py  # fullscreen launch and F11, with fake hardware
 .venv/bin/python tests/smoke_recovery.py  # corrupt state, visible errors and safe shutdown
 .venv/bin/python tests/smoke_map_cache.py  # local-server, cross-launch cache check
 .venv/bin/pip wheel --no-deps -w /tmp/locus-wheels .
