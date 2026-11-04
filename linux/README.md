@@ -258,6 +258,12 @@ Demo mode uses separate files. These personal files are never included in Git.
 
 ## Verification
 
+GitHub Actions runs the Linux unit suite with offscreen Qt on Python 3.12 and
+3.14, checks installed dependencies and builds a wheel on pushes and pull
+requests. It uses no phone or desktop session. Native GUI smoke tests and
+physical-device verification remain separate local checks. See the
+[Blueprint review](docs/blueprint-review.md).
+
 ```sh
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/pip check
