@@ -48,6 +48,14 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   the connection. Indoor connections cover up to 300 metres (984 ft). This approximates indoor movement;
   room walls, corridors and floor changes are not modeled. Indoor paths turn around concave building corners instead of detouring outside.
   Missing footprints keep normal outdoor routing. Connections do not infer doors.
+- Driving pins inside mapped parking garages connect through mapped vehicle-access
+  roads to a road junction, instead of walking or snapping through the garage wall.
+  Garage travel stays motorized at up to 10 km/h (6.2 mph), respects mapped one-way
+  access and excludes vehicle-prohibited paths. Interior movement is approximate;
+  floor changes, ramps and stall layouts are not modeled. A recognized garage
+  without connected mapped vehicle access reports a planning error instead of a
+  walking shortcut through its walls. Garage detection uses
+  bounded, cached OpenStreetMap read requests and applies to all locations.
 - Automatic driving speed from mapped road speeds/limits and surface information,
   with acceleration and braking toward turns/lower limits. Missing data is labeled
   as an estimate. Manual speed overrides are available per segment. This estimates

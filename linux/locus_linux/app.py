@@ -1054,6 +1054,8 @@ class Window(QMainWindow):
                 signs = sum(stop['kind'] == 'stop_sign' for stop in option.get('stops', []))
                 lights = sum(stop['kind'] == 'traffic_light' for stop in option.get('stops', []))
                 text += f'\n{signs} stop signs · {lights} traffic lights'
+                if option.get('garage_warning'):
+                    text += '\n' + option['garage_warning']
                 if option.get('traffic_warning'):
                     text += '\n' + option['traffic_warning']
             else:

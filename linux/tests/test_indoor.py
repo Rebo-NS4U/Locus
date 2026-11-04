@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from locus_linux.indoor import inside_connection, building_access, walking_path
 from locus_linux.services import Services
@@ -40,6 +40,11 @@ class FootprintTests(unittest.TestCase):
 
 
 class IndoorServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        lookup = patch.object(Services, 'garage_connection', new_callable=AsyncMock, return_value=None)
+        lookup.start()
+        self.addCleanup(lookup.stop)
+
     ring = [(0, 0), (0, .002), (.002, .002), (.002, 0), (0, 0)]
 
     def service(self):

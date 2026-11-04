@@ -8,6 +8,9 @@ from locus_linux.services import Services, encode_shape, NoRouteFound
 
 class WalkingTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        garage = patch.object(Services, 'garage_connection', new_callable=AsyncMock, return_value=None)
+        garage.start()
+        self.addCleanup(garage.stop)
         lookup = patch.object(Services, 'indoor_connection', new_callable=AsyncMock, return_value=None)
         lookup.start()
         self.addCleanup(lookup.stop)

@@ -2,6 +2,7 @@ import asyncio
 import copy
 import tempfile
 import unittest
+from unittest.mock import patch, AsyncMock
 from pathlib import Path
 
 from locus_linux.engine import Session
@@ -118,6 +119,11 @@ class DocumentTests(unittest.TestCase):
 
 
 class MixedServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        lookup = patch.object(Services, 'garage_connection', new_callable=AsyncMock, return_value=None)
+        lookup.start()
+        self.addCleanup(lookup.stop)
+
     async def test_99_pin_route_plans_all_98_segments(self):
         plan = RoutePlan()
         plan.reset([(0, i / 1000) for i in range(99)])

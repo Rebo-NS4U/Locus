@@ -206,6 +206,51 @@ class Services:
             return None
         return None
 
+    async def garage_connection(self, point, departing=True, target=None):
+        from .garages import garage_access, GarageExitUnavailable
+        import math
+        lat, lon = point
+        if abs(lat) > 89.9 or abs(lon) > 179.9:
+            return None
+        south, west = math.floor(lat * 500) / 500 - .002, math.floor(lon * 500) / 500 - .002
+        try:
+            response = await self.get(f'{OSM_READ}/map.json', {'bbox': f'{west},{south},{west + .006},{south + .006}'})
+            return garage_access(response.get('elements', []), point, departing, target)
+        except GarageExitUnavailable:
+            raise
+        except Exception:
+            return None
+
+    @staticmethod
+    def attach_garage_paths(option, prefix, suffix, spec):
+        """Keep estimated garage travel motorized; preserve mapped-road metadata."""
+        speed = min(10, spec['speed_kph']) / 3.6 if spec['speed_mode'] == 'manual' else 10 / 3.6
+        automatic = spec['speed_mode'] == 'auto'
+        for path, first in ((prefix, True), (suffix, False)):
+            if not path:
+                continue
+            # The sub-metre junction connector is also part of vehicle access.
+            edge = 0 if first else -1
+            if option['sources'][edge] == 'pin connector':
+                option['speeds'][edge] = speed
+                option['sources'][edge] = 'garage junction connection estimate'
+                option['motorized'][edge] = True
+                option['driving'][edge] = automatic
+            count = len(path) - 1
+            if first:
+                option['points'] = path[:-1] + option['points']
+                for stop in option.get('stops', []):
+                    stop['index'] += count
+            else:
+                option['points'] += path[1:]
+            for key, values in (
+                ('speeds', [speed] * count),
+                ('sources', ['garage access estimate'] * count),
+                ('driving', [automatic] * count), ('motorized', [True] * count)):
+                option[key] = values + option[key] if first else option[key] + values
+        if prefix or suffix:
+            option['garage_warning'] = 'Mapped vehicle access roads; movement within the garage is approximate (floors and ramps are not modeled).'
+
     async def mixed_route(self, legs, url=VALHALLA, overpass_url=OVERPASS, include_stops=True):
         from .planning import specification, PROFILES, MAX_PINS, SHORT_WALK_METRES
         if not 1 <= len(legs) < MAX_PINS:
@@ -220,10 +265,22 @@ class Services:
         for number, (start, end, spec) in enumerate(validated, 1):
             profile = PROFILES[spec["profile"]]
             waypoints = [start, *spec["controls"], end]
+            prefix = suffix = garage_path = None
             try:
+                if profile['costing'] == 'auto':
+                    prefix = await self.garage_connection(start, True, end)
+                    if prefix and distance(prefix[-1], end) <= .05:
+                        garage_path, prefix = prefix, None
+                    else:
+                        suffix = await self.garage_connection(end, False, start)
+                        if suffix and distance(suffix[0], start) <= .05:
+                            garage_path, suffix = suffix, None
+                    waypoints = [prefix[-1] if prefix else start, *spec['controls'], suffix[0] if suffix else end]
                 short_walk = spec["profile"] == "walk_auto" and Route(waypoints).total <= SHORT_WALK_METRES
                 indoor = await self.indoor_connection(start, end, overpass_url) if spec['profile'] == 'walk_auto' and not spec['controls'] else None
-                if indoor:
+                if garage_path:
+                    choices = [{'points': garage_path, 'garage_warning': 'Mapped vehicle exit road; garage interior movement is approximate.'}]
+                elif indoor:
                     choices = [indoor]
                 elif profile["costing"]:
                     mode = {"auto": "Drive", "pedestrian": "Walk", "bicycle": "Cycle"}[profile["costing"]]
@@ -240,11 +297,17 @@ class Services:
                 rejected = []
                 for choice in choices:
                     option = copy.deepcopy(choice)
-                    await self.speed_metadata(option, spec, url, overpass_url, include_stops)
+                    await self.speed_metadata(option, {**spec, 'profile': 'offroad_car'} if garage_path else spec, url, overpass_url, include_stops)
+                    if garage_path:
+                        count = len(option['points']) - 1
+                        speed = min(10, spec['speed_kph']) / 3.6 if spec['speed_mode'] == 'manual' else 10 / 3.6
+                        option.update(speeds=[speed] * count, sources=['garage access estimate'] * count,
+                                      driving=[spec['speed_mode'] == 'auto'] * count, motorized=[True] * count)
                     try:
                         running = profile["costing"] == "pedestrian" and not spec["profile"].startswith("walk_")
                         max_gap = 2 if running else float("inf")
-                        self.anchor(option, start, end, max_gap=max_gap)
+                        self.anchor(option, waypoints[0] if prefix else start, waypoints[-1] if suffix else end, max_gap=max_gap)
+                        self.attach_garage_paths(option, prefix, suffix, spec)
                     except ValueError as error:
                         rejected.append(str(error))
                         continue
