@@ -6,7 +6,8 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 
 ## Features
 
-- A persistent navigation rail opens Places, Routes, Movement, Map and Settings.
+- A compact workspace menu in the top toolbar opens Places, Routes, Movement,
+  Map and Settings without reserving a vertical navigation column.
   Phone selection and device tools have their own toolbar below the location actions.
   Each workspace has a heading and a short description of its controls.
 - Route studio combines stop cards and their settings in one resizable workspace.

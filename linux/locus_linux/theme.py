@@ -90,8 +90,6 @@ def apply_theme(app, colors=None):
         QWidget#toolbar { background: %(card)s; border: 1px solid %(edge)s; border-radius: 18px; }
         QWidget#statusbar { background: transparent; }
         QWidget#deviceToolbar { background: %(card)s; border-radius: 12px; }
-        QWidget#navigationRail { background: %(card)s; border: 1px solid %(edge)s; border-radius: 14px; }
-        QPushButton#navigationItem { text-align: left; padding: 12px 14px; }
         QWidget#playbackDock { background: %(card)s; border: 1px solid %(edge)s; border-radius: 14px; }
         QLabel#sectionTitle { color: %(accent)s; font-weight: 700; padding: 4px 8px; }
         QFrame#stopCard { background: transparent; }

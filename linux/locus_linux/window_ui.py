@@ -106,21 +106,19 @@ class WindowUiMixin(RoutePanelMixin):
         layout.addWidget(device_toolbar)
         workspace = QHBoxLayout()
         workspace.setSpacing(8)
-        navigation = QWidget()
-        navigation.setObjectName('navigationRail')
-        nav = QVBoxLayout(navigation)
-        nav.setContentsMargins(4, 8, 4, 8)
-        nav.setSpacing(6)
+        self.workspace_menu_button = QToolButton()
+        self.workspace_menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.workspace_menu_button.setToolTip('Choose Places, Routes, Movement, Map or Settings')
+        self.workspace_menu_button.setAccessibleName('Workspace menu')
+        self.workspace_menu = QMenu(self.workspace_menu_button)
         self.navigation_buttons = []
         for index, label in enumerate(('Places', 'Routes', 'Movement', 'Map', 'Settings')):
-            button = QPushButton(label)
-            button.setCheckable(True)
-            button.setObjectName('navigationItem')
-            button.clicked.connect(lambda checked=False, page=index: self.open_workspace(page))
-            nav.addWidget(button)
-            self.navigation_buttons.append(button)
-        nav.addStretch()
-        workspace.addWidget(navigation)
+            action = self.workspace_menu.addAction(label)
+            action.setCheckable(True)
+            action.triggered.connect(lambda checked=False, page=index: self.open_workspace(page))
+            self.navigation_buttons.append(action)
+        self.workspace_menu_button.setMenu(self.workspace_menu)
+        header.insertWidget(2, self.workspace_menu_button)
         split = QSplitter()
         self.split = split
         split.setHandleWidth(12)
@@ -211,10 +209,13 @@ class WindowUiMixin(RoutePanelMixin):
     def open_workspace(self, index):
         self.tabs.setCurrentIndex(index)
         self.sidebar_toggle.setChecked(True)
+        self.sync_navigation(index)
 
     def sync_navigation(self, index):
         for page, button in enumerate(self.navigation_buttons):
             button.setChecked(page == index)
+            if page == index:
+                self.workspace_menu_button.setText(button.text() + ' ▾')
         if hasattr(self, 'map') and index != self.inspector_index:
             if self.tabs.isVisible():
                 self.workspace_widths[self.inspector_index] = self.split.sizes()[0]
