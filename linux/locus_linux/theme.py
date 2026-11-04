@@ -127,7 +127,13 @@ def apply_theme(app, colors=None):
         QToolButton::menu-indicator { image: none; }
         QLineEdit, QDoubleSpinBox, QSpinBox, QTimeEdit, QComboBox, QListWidget, QTextEdit, QPlainTextEdit { background: %(field)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 12px; padding: 6px; selection-background-color: %(accent)s; selection-color: %(on_accent)s; }
         QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus, QComboBox:focus, QListWidget:focus { border-color: %(accent)s; }
-        QComboBox QAbstractItemView { background: %(surface)s; color: %(text)s; selection-background-color: %(accent)s; selection-color: %(on_accent)s; border: 1px solid %(border)s; }
+        /* Neutral assistant-style dropdowns stay readable with any wallpaper palette. */
+        QComboBox { background: #000000; color: #eeeeee; border-color: #404040; padding-right: 24px; }
+        QComboBox:hover, QComboBox:on { background: #292929; color: #ffffff; }
+        QComboBox:disabled { color: #888888; }
+        QComboBox QAbstractItemView { background: #000000; color: #eeeeee; selection-background-color: #353535; selection-color: #ffffff; border: 1px solid #404040; outline: 0; padding: 4px; }
+        QComboBox QAbstractItemView::item { min-height: 28px; padding: 4px 10px; }
+        QComboBox QAbstractItemView::item:hover, QComboBox QAbstractItemView::item:selected { background: #353535; color: #ffffff; }
         QListWidget::item { padding: 10px 12px; border-radius: 8px; }
         QListWidget::item:hover { background: %(hover)s; }
         QListWidget::item:selected { background: %(pressed)s; color: %(text)s; border-left: 3px solid %(accent)s; }
@@ -145,11 +151,11 @@ def apply_theme(app, colors=None):
         QCheckBox::indicator:disabled, QRadioButton::indicator:disabled { background: %(disabled)s; border-color: %(muted)s; }
         QLabel#subtitle { color: %(muted)s; }
         QLabel#status { background: transparent; border-radius: 10px; padding: 4px 8px; }
-        QMenu { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; border-radius: 12px; padding: 6px; }
+        QMenu { background: #000000; color: #eeeeee; border: 1px solid #404040; border-radius: 12px; padding: 6px; }
         QMenu::item { padding: 7px 18px; border-radius: 8px; }
-        QMenu::item:selected { background: %(hover)s; color: %(text)s; }
-        QMenu::item:disabled { color: %(muted)s; }
-        QMenu::separator { height: 1px; background: %(border)s; margin: 5px 8px; }
+        QMenu::item:selected { background: #353535; color: #ffffff; }
+        QMenu::item:disabled { color: #888888; }
+        QMenu::separator { height: 1px; background: #404040; margin: 5px 8px; }
         QToolTip { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; }
         QScrollArea { border: 0; } QSplitter::handle { background: transparent; }
     """ % style)

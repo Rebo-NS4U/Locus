@@ -31,6 +31,8 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   row, with seconds, minutes, hours and days supported (up to seven days).
   Show return stops exposes the reverse sequence; these stops still share their
   locations and departure rules with the corresponding outbound stops.
+- Dropdowns and toolbar menus use black backgrounds with white lettering and
+  lighter gray hover/selection rows with brighter white text, matching the assistant.
 - Buttons follow Quickshell's settings-control proportions, tinted fills, hover
   states and focus border. Corner rounding and surface mode read from
   `~/.config/rebos_shell/config/theme.json`, with safe defaults when unavailable.
