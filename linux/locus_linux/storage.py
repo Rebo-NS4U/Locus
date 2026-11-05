@@ -48,7 +48,8 @@ class Places:
             if key in settings and not isinstance(settings[key], str):
                 raise ValueError(f'Invalid {key} setting')
         for key, (lower, upper) in {'speed_kph': (0.36, 360), 'red_probability': (0, 100),
-                                    'motion_revision': (0, 2**31 - 1)}.items():
+                                    'motion_revision': (0, 2**31 - 1),
+                                    'default_latitude': (-90, 90), 'default_longitude': (-180, 180)}.items():
             if key in settings and (type(settings[key]) not in (int, float) or
                                     not lower <= settings[key] <= upper or not math.isfinite(settings[key])):
                 raise ValueError(f'Invalid {key} setting')

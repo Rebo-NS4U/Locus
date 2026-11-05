@@ -4,6 +4,11 @@ from PySide6.QtCore import Qt
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
 
+def opening_geometry(available):
+    """Leave a small desktop margin around the normal, resizable window."""
+    return available.adjusted(12, 12, -12, -12)
+
+
 def activate_existing(name):
     socket = QLocalSocket()
     socket.connectToServer(name)

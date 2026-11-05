@@ -34,6 +34,8 @@ class RouteLibraryMixin:
                 continue
             value = entry['document']
             detail = f"{len(value['points'])} track points" if value['format'] == 'locus-track' else f"{len(value['pins'])} stops · editable route"
+            if value['format'] == 'locus-route' and len(value['pins']) == 1:
+                detail = 'Single point · saved location'
             item = QListWidgetItem(entry['name'] + '\n' + detail)
             item.setData(Qt.ItemDataRole.UserRole, entry['id'])
             self.library_list.addItem(item)
@@ -97,7 +99,11 @@ class RouteLibraryMixin:
             self.remember_route_draft()
             self.library_toggle.setChecked(False)
             self.js('fitRoute()')
-            self.status.setText('Route opened. Paths refresh automatically. Press Start when ready.')
+            if len(self.stops) == 1:
+                self.select_coordinates(*self.stops[0])
+                self.status.setText('Saved point opened. Press Start to set this location.')
+            else:
+                self.status.setText('Route opened. Paths refresh automatically. Press Start when ready.')
         except (OSError, ValueError, KeyError, StopIteration) as error:
             self.status.setText(f'Could not open route: {error}')
 
@@ -145,8 +151,8 @@ class RouteLibraryMixin:
             if self.imported_track:
                 raise ValueError("Use Export GPX to save this imported track; route projects save editable pin-to-pin settings.")
             data = self.route_plan.serialize()
-            if len(data["pins"]) < 2:
-                raise ValueError("Add at least two pins before saving a project")
+            if not data["pins"]:
+                raise ValueError("Add at least one pin before saving a project")
             path, _ = QFileDialog.getSaveFileName(self, "Save editable route", "route.locus.json", "Locus route (*.locus.json)")
             if path:
                 Path(path).write_text(json.dumps(data, indent=2))

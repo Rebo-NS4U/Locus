@@ -268,8 +268,8 @@ class RoutePlan:
         if value.get("format") != "locus-route" or value.get("version") != 1:
             raise ValueError("Not a supported Locus route project")
         pins, legs = value.get("pins", []), value.get("legs", [])
-        if not 2 <= len(pins) <= MAX_PINS or len(legs) != len(pins) - 1:
-            raise ValueError(f"Project needs 2–{MAX_PINS} pins and one setting per segment")
+        if not 1 <= len(pins) <= MAX_PINS or len(legs) != len(pins) - 1:
+            raise ValueError(f"Project needs 1–{MAX_PINS} pins and one setting per segment")
         plan = cls()
         for pin in pins:
             plan.add(pin["point"])

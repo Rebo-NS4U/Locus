@@ -66,7 +66,7 @@ window.setRoute = (points, stops, segments = [], selected = -1) => {
   });
 };
 window.fitRoute = () => {
-  if (routeLine && routeLine.getBounds().isValid()) map.fitBounds(routeLine.getBounds(), {padding: [35, 35]});
+  if (routeLine && routeLine.getBounds().isValid()) map.fitBounds(routeLine.getBounds(), {padding: [35, 35], maxZoom: 16});
 };
 new QWebChannel(qt.webChannelTransport, channel => {
   bridge = channel.objects.locus;

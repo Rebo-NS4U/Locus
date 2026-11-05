@@ -10,6 +10,7 @@ os.environ['XDG_CACHE_HOME'] = root.name + '/cache'
 
 from PySide6.QtWidgets import QApplication
 from locus_linux.app import Window, main
+from locus_linux.activation import opening_geometry
 from locus_linux.worker import Worker
 
 
@@ -18,8 +19,8 @@ def check_launch():
     app.processEvents()
     window = next(widget for widget in app.topLevelWidgets() if isinstance(widget, Window))
     assert not window.isFullScreen() and not window.isMaximized(), 'Launch as a normal window'
-    expected_size = window.screen().availableGeometry().size().expandedTo(window.minimumSize())
-    assert window.size() == expected_size, 'Fill the available desktop area, respecting minimum size'
+    expected_size = opening_geometry(window.screen().availableGeometry()).size().expandedTo(window.minimumSize())
+    assert window.size() == expected_size, 'Leave a visible border around the desktop-sized window'
     window.fullscreen_shortcut.activated.emit()
     assert window.isFullScreen(), 'F11 must still support optional fullscreen'
     window.fullscreen_shortcut.activated.emit()

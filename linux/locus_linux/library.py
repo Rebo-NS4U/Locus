@@ -69,8 +69,8 @@ class RouteLibrary:
         if not name:
             raise ValueError('Give this route a name')
         value = document(value)
-        if value['format'] == 'locus-route' and len(value['pins']) < 2:
-            raise ValueError('Add at least two stops before saving')
+        if value['format'] == 'locus-route' and not value['pins']:
+            raise ValueError('Add at least one stop before saving')
         data = copy.deepcopy(self.data)
         if identifier is None:
             identifier = uuid.uuid4().hex

@@ -151,7 +151,10 @@ class MapInteractionMixin:
             self.map_typography()
             self.map_options()
             self.redraw_route()
-            if self.stops:
+            settings = self.store.data['settings']
+            if 'default_latitude' in settings or 'default_longitude' in settings:
+                self.js('focusLocation', settings.get('default_latitude', 40.7128), settings.get('default_longitude', -74.006))
+            elif self.stops:
                 self.js("fitRoute()")
 
     def map_typography(self):

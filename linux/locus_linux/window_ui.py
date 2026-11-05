@@ -391,6 +391,21 @@ class WindowUiMixin(RoutePanelMixin):
         label = QLabel("After reconnecting, routes remain paused. Saved sessions never restart automatically after reopening Locus.")
         label.setWordWrap(True)
         group.addWidget(label)
+        group = self.group('Map opening location', box)
+        self.default_latitude, self.default_longitude = QDoubleSpinBox(), QDoubleSpinBox()
+        for label, field, limit, value in [
+                ('Default latitude', self.default_latitude, 90, 40.7128),
+                ('Default longitude', self.default_longitude, 180, -74.006)]:
+            field.setRange(-limit, limit)
+            field.setDecimals(6)
+            field.setValue(self.store.data['settings'].get(label.lower().replace(' ', '_'), value))
+            field.setAccessibleName(label)
+            group.addWidget(QLabel(label))
+            group.addWidget(field)
+        self.button('Use selected map coordinates', self.copy_opening_location, group)
+        label = QLabel('Save settings to use this map location next time Locus opens.')
+        label.setWordWrap(True)
+        group.addWidget(label)
         group = self.group("Map services", box)
         group.addWidget(QLabel("Photon search endpoint"))
         self.photon = QLineEdit(self.store.data["settings"].get("photon", PHOTON))
@@ -409,3 +424,7 @@ class WindowUiMixin(RoutePanelMixin):
             group.addWidget(label)
         box.addStretch()
         return page
+
+    def copy_opening_location(self):
+        self.default_latitude.setValue(self.latitude.value())
+        self.default_longitude.setValue(self.longitude.value())

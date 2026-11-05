@@ -303,7 +303,7 @@ class RoutePanelMixin:
         self.button('Pause', lambda: self.request('control', 'pause'), row, True)
         self.button('Resume', lambda: self.request('control', 'resume'), row, True)
         footer.addLayout(row)
-        self.route_summary = StatusLabel('Add two stops, or import GPX from Route ⋯.')
+        self.route_summary = StatusLabel('Add a saved point or two stops for a route, or import GPX.')
         self.route_summary.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.route_summary.setFixedHeight(22)
         footer.addWidget(self.route_summary)

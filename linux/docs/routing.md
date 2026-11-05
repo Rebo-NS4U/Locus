@@ -166,6 +166,17 @@ Driving stops enabled to load controls; walking and free paths do not acquire th
 
 ## Save, load and export
 
+Routes can also hold a single saved point. Add one stop, give it a name and
+save it; reopening it and pressing Start sets that location without planning
+a path. Single points also work in editable route project files. GPX export
+still requires a path with at least two points.
+
+Settings → Map opening location chooses the starting map coordinates for the
+next launch. Use selected map coordinates copies the location selected in the
+Map section; Save settings persists it. This preference only centers the map
+and never sets the phone's location automatically. Locus opens as a normal,
+resizable window spanning the available desktop with a 12-pixel outer margin.
+
 **Save route project** writes an editable `.locus.json` file containing pins,
 profiles, bend points and automatic/manual speed settings. **Load project**
 restores those definitions; plan again to regenerate current paths and speed data.

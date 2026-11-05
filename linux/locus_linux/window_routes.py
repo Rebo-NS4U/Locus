@@ -271,6 +271,10 @@ class RouteEditorMixin:
 
     def rebuild_route(self):
         self.route_points, self.route_profile = [], None
+        if len(self.stops) == 1:
+            self.route_summary.setText('Single point · Start sets this location.')
+            self.redraw_route()
+            return
         try:
             combined = self.route_plan.assemble()
             self.route_points = combined.pop("points")
@@ -371,6 +375,10 @@ class RouteEditorMixin:
             self.stops_changed()
 
     def start_route(self):
+        if not self.imported_track and len(self.stops) == 1:
+            self.select_coordinates(*self.stops[0])
+            self.perform('apply')
+            return
         if len(self.route_points) < 2:
             self.status.setText("Plan the segments, or import a GPX path, before starting a route.")
             return

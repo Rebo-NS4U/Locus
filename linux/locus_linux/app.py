@@ -13,7 +13,7 @@ from .services import endpoint
 from .theme import apply_theme
 from .units import to_mph, to_kph, speed_text
 from .planning import RoutePlan
-from .activation import activate_existing, listen_for_activation
+from .activation import activate_existing, listen_for_activation, opening_geometry
 
 
 from .worker import Worker as Worker, state_directory as state_directory
@@ -65,6 +65,7 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
         self.foreground_buttons = []
         self.build_ui()
         preferences = self.store.data["settings"]
+        self.select_coordinates(preferences.get('default_latitude', 40.7128), preferences.get('default_longitude', -74.006))
         self.travel_mode.setCurrentText(preferences.get("travel_mode", "Walk"))
         self.speed.setValue(to_mph(preferences.get("speed_kph", to_kph(self.speed.value()))))
         self.variation.setChecked(preferences.get("variation", True) if preferences.get("motion_revision") == 1 else True)
@@ -240,7 +241,8 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
             self.store.update_settings(photon=endpoint(self.photon.text().strip()), valhalla=endpoint(self.valhalla.text().strip()),
                 reconnect=self.reconnect.isChecked(), notifications=self.notifications.isChecked(), travel_mode=self.travel_mode.currentText(),
                 motion_revision=1, speed_kph=to_kph(self.speed.value()), variation=self.variation.isChecked(), night_map=self.map_style.currentIndex() == 0, follow=self.follow.isChecked(),
-                traffic_stops=self.traffic_stops.isChecked(), red_probability=self.red_probability.value(), overpass=endpoint(self.overpass.text().strip()))
+                traffic_stops=self.traffic_stops.isChecked(), red_probability=self.red_probability.value(), overpass=endpoint(self.overpass.text().strip()),
+                default_latitude=self.default_latitude.value(), default_longitude=self.default_longitude.value())
             self.configure_motion()
             self.status.setText("Settings saved.")
         except (OSError, ValueError) as error:
@@ -294,7 +296,7 @@ def main():
         return 1
     window = Window(options.demo)
     window.activation_server = listen_for_activation(activation_name, window)
-    window.setGeometry(window.screen().availableGeometry())
+    window.setGeometry(opening_geometry(window.screen().availableGeometry()))
     window.show()
     return app.exec()
 

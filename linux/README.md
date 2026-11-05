@@ -6,9 +6,11 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 
 ## Features
 
-- Opens as a normal window sized to the desktop's available area, leaving room
-  for desktop panels. Press **F11** for optional fullscreen; activating an existing
+- Opens as a normal window spanning the desktop's available area with a 12-pixel
+  margin to keep its border visible. Press **F11** for optional fullscreen; activating an existing
   instance preserves its window mode.
+- Settings → Map opening location saves the starting map coordinates. Routes
+  can save a single point; reopen it and press **Start** to set that location.
 - A compact workspace menu in the top toolbar opens Places, Routes, Movement,
   Map and Settings without reserving a vertical navigation column.
   Phone selection and device tools have their own toolbar below the location actions.
