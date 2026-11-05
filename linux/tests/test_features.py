@@ -99,6 +99,20 @@ class MotionTests(unittest.IsolatedAsyncioTestCase):
         await self.session.tick(1)
         self.assertEqual(count, len(self.transport.calls))
 
+    async def test_stop_route_holds_current_position_and_requires_restart(self):
+        await self.session.start_route('phone', [(0, 0), (0, .01)])
+        await self.session.tick(1)
+        held = self.session.target
+        self.assertNotEqual(held, (0, 0))
+        await self.session.control('hold')
+        self.assertEqual(self.session.mode, 'fixed')
+        self.assertEqual(self.session.motion_speed, 0)
+        for _ in range(5):
+            await self.session.tick(1)
+        self.assertEqual(self.session.target, held)
+        with self.assertRaises(ValueError):
+            await self.session.control('resume')
+
     async def test_sleep_pauses_and_reconnection_never_resumes_route(self):
         await self.session.start_route('phone', [(0, 0), (0, .01)])
         await self.session.tick(30)

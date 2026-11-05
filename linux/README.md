@@ -13,7 +13,10 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   can save a single point; reopen it and press **Start** to set that location.
 - A compact workspace menu in the top toolbar opens Places, Routes, Movement,
   Map and Settings without reserving a vertical navigation column.
-  Phone selection and device tools have their own toolbar below the location actions.
+  Phone selection and device tools have their own toolbar. Location and route
+  actions share a persistent toolbar: Set location, Plan, Start, Pause, Resume,
+  Stop here, Continue from stop (when waiting), and Restore. Stop here ends
+  movement at the current simulated position; Start begins the route again.
   Each workspace has a heading and a short description of its controls.
 - Route studio combines stop cards and their settings in one resizable workspace.
   Compact cards show each numbered stop, wait rule and onward leg. Hover a card
@@ -24,7 +27,8 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   The studio opens wider than other workspaces and remembers its width; on
   windows narrower than 1100 pixels it uses the full workspace. Hide Controls
   to return to the map. Narrow editor panes stack the trip and settings.
-  The route name, Save, file menu and playback dock stay fixed. Idle playback
+  The route name, Save, file menu and playback status stay fixed.
+  Playback buttons remain in the main toolbar even with Controls hidden. Idle playback
   status uses one line and expands for movement or traffic details.
   New route and file actions live in Route ⋯.
   Its Trip options section contains There and back, Loop route and Show return stops.
@@ -54,7 +58,7 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   legend live in Controls → Map; scanning, preparation and setup are in the
   Device options menu. Navigation stays pinned while each page scrolls independently, and reopening
   Controls preserves its width. Status updates keep the action bar and footer stable.
-  Set location, Hold and Restore remain accessible with Controls hidden.
+  Location and route actions remain accessible with Controls hidden.
 - Explicit place search, map pins, coordinates, favorites, rename/delete and
   twenty recent applied locations. Selecting a place centers the map without applying it.
 - Eight-direction joystick and optional WASD/arrow-key controls. Releasing the
