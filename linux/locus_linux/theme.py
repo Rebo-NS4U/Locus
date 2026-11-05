@@ -159,4 +159,16 @@ def apply_theme(app, colors=None):
         QToolTip { background: %(surface)s; color: %(text)s; border: 1px solid %(border)s; }
         QScrollArea { border: 0; } QSplitter::handle { background: transparent; }
     """ % style)
+    # Style the arrow after the shared theme so native square subcontrols cannot
+    # cover the rounded field edge, and reserve space for the label separately.
+    arrow = (Path(__file__).parent / 'web/chevron-down.svg').as_posix()
+    app.setStyleSheet(app.styleSheet() + f"""
+        QComboBox {{ padding-right: 36px; }}
+        QComboBox::drop-down {{
+            subcontrol-origin: padding; subcontrol-position: top right;
+            width: 26px; margin: 4px 6px 4px 0;
+            border: none; background: transparent;
+        }}
+        QComboBox::down-arrow {{ image: url("{arrow}"); width: 10px; height: 6px; }}
+    """)
     return c
