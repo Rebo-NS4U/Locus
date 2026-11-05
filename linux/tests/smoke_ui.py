@@ -45,7 +45,6 @@ def fake_request(url, params):
 
 app = QApplication([])
 window = Window(demo=True)
-window.auto_plan_timer.setInterval(60000)
 window.show()
 loaded = False
 stage = 0

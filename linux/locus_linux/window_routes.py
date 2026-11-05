@@ -145,7 +145,6 @@ class RouteEditorMixin:
         self.highlight_active_leg(self.motion.get("active_leg"), force=True)
         self.rebuild_route()
         self.remember_route_draft()
-        self.schedule_automatic_route()
 
     def change_timer_unit(self, *unused):
         if self.departure_loading:
@@ -305,24 +304,7 @@ class RouteEditorMixin:
         self.route_summary.setText(f"{source} · {route.total / METRES_PER_MILE:.2f} mi · {len(route.points)} points")
         self.redraw_route()
 
-    def schedule_automatic_route(self):
-        if not self.imported_track and len(self.stops) >= 2 and any(
-                not self.route_plan.results.get(self.route_plan.key(i)) for i in range(self.route_plan.leg_count)):
-            self.auto_plan_timer.start()
-        else:
-            self.auto_plan_timer.stop()
-
-    def refresh_automatic_route(self):
-        if self.imported_track or len(self.stops) < 2 or self.closing:
-            return
-        if self.busy or not self.ready:
-            self.auto_plan_timer.start()
-            return
-        if self.editable_route():
-            self.plan_route()
-
     def plan_route(self):
-        self.auto_plan_timer.stop()
         if not self.busy and self.editable_route():
             self.planning_revision = self.route_plan.revision
             self.planning_document = self.route_plan

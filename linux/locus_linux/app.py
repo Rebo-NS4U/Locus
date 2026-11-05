@@ -48,10 +48,6 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
         self.segment_loading = False
         self.departure_loading = False
         self.map_loaded = False
-        self.auto_plan_timer = QTimer(self)
-        self.auto_plan_timer.setSingleShot(True)
-        self.auto_plan_timer.setInterval(600)
-        self.auto_plan_timer.timeout.connect(self.refresh_automatic_route)
         self.imported_track = False
         self.source_track_points = []
         self.motion = {"mode": "fixed", "connected": False}
@@ -197,10 +193,9 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
                 self.route_plan.accept(result, self.planning_revision)
                 self.stops_changed()
                 self.js("fitRoute()")
-                self.status.setText("Paths chosen automatically. Select a colored segment to change its travel mode.")
+                self.status.setText("Route planned. Select a colored segment to change its travel mode.")
             except ValueError as error:
                 self.status.setText(speed_text(str(error)))
-                self.schedule_automatic_route()
         elif operation == "set_mode":
             self.devices.clear()
             self.status.setText(result)

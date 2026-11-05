@@ -70,20 +70,15 @@ with patch.object(Worker, 'start'):
     first.departure_time.setTime(QTime(12, 0))
     assert first.departure_time.text() == '12:00 PM'
     first.departure_time.setTime(QTime(16, 30))
-    first.move_stop(0, 35.0001, -111)
-    assert first.auto_plan_timer.isActive()
     first.ready = True
-    with patch.object(first, 'plan_route') as plan_call:
-        first.busy = True
-        first.auto_plan_timer.start(1)
-        QTest.qWait(50)
-        plan_call.assert_not_called()
-        first.busy = False
-        first.auto_plan_timer.start(1)
-        QTest.qWait(50)
-        plan_call.assert_called_once()
+    with patch.object(first, 'request') as request_call:
+        first.move_stop(0, 35.0001, -111)
+        QTest.qWait(750)
+        request_call.assert_not_called()
+        first.plan_route()
+        request_call.assert_called_once()
+        assert request_call.call_args.args[0] == 'mixed_route'
     first.ready = False
-    first.auto_plan_timer.stop()
     second = Window(demo=True)
     second.busy = False
     assert second.stops[0] == (35.0001, -111)
@@ -100,9 +95,9 @@ with patch.object(Worker, 'start'):
     track = {'format': 'locus-track', 'version': 1, 'points': [(35, -111), (35.001, -111), (35.002, -111)]}
     second.apply_route_document(track)
     assert second.imported_track
-    with patch.object(second, 'plan_route') as plan_call:
-        second.refresh_automatic_route()
-        plan_call.assert_not_called()
+    with patch.object(second, 'request') as request_call:
+        QTest.qWait(750)
+        request_call.assert_not_called()
     second.there_and_back.setChecked(True)
     assert second.route_points == track['points'] + track['points'][-2::-1]
     second.route_title.setText('Imported walk')

@@ -208,18 +208,19 @@ Developer Mode under Settings → Privacy & Security and restart if prompted.
 First preparation requires internet to fetch Apple's developer disk image.
 
 Single-click the map to add a numbered route pin; no drawing toggle is needed,
-even with Controls hidden. Paths between stops are chosen automatically.
+even with Controls hidden. Add or edit stops, then press **Plan** to choose paths.
 Search, saved places and coordinate fields select coordinates without adding route
 pins. Map clicks do not send phone commands. **Set location** sends it to the selected phone. Check the result in Maps.
 Use Move for joystick/imported-GPX speed controls. On Route, add or drag pins,
-choose **Walking**, **Driving** or **Cycling** for each segment. Paths refresh
-automatically after edits. **Plan route** remains available to retry.
+choose **Walking**, **Driving** or **Cycling** for each segment, then press
+**Plan** to calculate the route. Editing pins or travel modes never starts planning
+automatically, and failed or outdated plans wait for you to press **Plan** again.
 Select a numbered stop and use **Departure from stop** to set its wait rule.
 During a manual wait, press **Continue from stop**; timed stops leave automatically.
 Name the route and press **Save route** (Ctrl+S) to keep it inside Locus.
 **Saved routes** opens your searchable library; double-click a route or press
 **Open** to restore it. Rename and delete are available there. Opening editable
-routes restores their stops and settings, then rebuilds paths automatically with
+routes restores their stops and settings; press **Plan** to rebuild paths with
 current map data. GPX tracks reopen with their exact geometry. The last working draft is
 restored automatically on startup. File import/export remains in **Route ⋯**.
 The library is stored privately in `$XDG_STATE_HOME/locus-linux/routes.json`
