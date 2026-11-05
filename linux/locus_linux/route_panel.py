@@ -305,7 +305,6 @@ class RoutePanelMixin:
         self.stop_route_button.setToolTip('Stop the route and hold the current simulated location. Start begins the route again.')
         self.continue_stop = self.button('Continue from stop', lambda: self.request('control', 'depart'), row, True)
         self.continue_stop.hide()
-        row.addStretch(1)
         self.button('Restore', lambda: self.perform('restore'), row, True).setToolTip('Clear simulated location and close the phone connection')
         self.route_summary = StatusLabel('Add a saved point or two stops for a route, or import GPX.')
         self.route_summary.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)

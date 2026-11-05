@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Window layout and control construction."""
 from pathlib import Path
-from PySide6.QtCore import QUrl, Qt, QTimer
+from PySide6.QtCore import QUrl, Qt, QTimer, QSize, QEvent
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox, QDoubleSpinBox, QLineEdit, QListWidget, QTabWidget, QGroupBox, QCheckBox, QSplitter, QScrollArea, QGridLayout, QSizePolicy, QToolButton, QMenu
 from PySide6.QtWebChannel import QWebChannel
@@ -13,6 +13,21 @@ from .services import PHOTON, VALHALLA, OVERPASS
 from .units import to_mph
 from .widgets import MapBridge, StatusLabel
 from .route_panel import RoutePanelMixin
+
+
+class ActionScrollArea(QScrollArea):
+    """Fit the floating dock to its controls, scrolling only on narrow maps."""
+
+    def sizeHint(self):
+        if self.widget() is None:
+            return super().sizeHint()
+        border = 2 * self.frameWidth()
+        return self.widget().sizeHint() + QSize(border, border)
+
+    def eventFilter(self, watched, event):
+        if watched is self.widget() and event.type() == QEvent.Type.LayoutRequest:
+            self.updateGeometry()
+        return super().eventFilter(watched, event)
 
 
 class WindowUiMixin(RoutePanelMixin):
@@ -186,7 +201,8 @@ class WindowUiMixin(RoutePanelMixin):
         map_layout.setContentsMargins(0, 0, 0, 0)
         map_layout.addWidget(self.map, 0, 0)
         # The map fills the cell beneath the floating controls.
-        self.floating_actions = QScrollArea()
+        self.floating_actions = ActionScrollArea()
+        self.floating_actions.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
         self.floating_actions.setObjectName('toolbar')
         self.floating_actions.setWidgetResizable(True)
         self.floating_actions.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -196,7 +212,11 @@ class WindowUiMixin(RoutePanelMixin):
         overlay = QVBoxLayout()
         overlay.setContentsMargins(16, 0, 16, 28)
         overlay.addStretch(1)
-        overlay.addWidget(self.floating_actions)
+        dock_row = QHBoxLayout()
+        dock_row.addStretch(1)
+        dock_row.addWidget(self.floating_actions)
+        dock_row.addStretch(1)
+        overlay.addLayout(dock_row)
         map_layout.addLayout(overlay, 0, 0)
         self.floating_actions.raise_()
         split.addWidget(self.map_workspace)
