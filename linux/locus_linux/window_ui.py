@@ -109,7 +109,6 @@ class WindowUiMixin(RoutePanelMixin):
         self.playback_controls.setContentsMargins(12, 8, 12, 8)
         self.playback_controls.setSpacing(8)
         self.button("Set location", lambda: self.perform("apply"), self.playback_controls, True)
-        layout.addWidget(self.action_toolbar)
         workspace = QHBoxLayout()
         workspace.setSpacing(8)
         self.workspace_menu_button = QToolButton()
@@ -182,7 +181,25 @@ class WindowUiMixin(RoutePanelMixin):
         self.map.page().setWebChannel(self.channel)
         self.map.loadFinished.connect(self.map_ready)
         self.map.setUrl(QUrl.fromLocalFile(str(Path(__file__).parent / "web/map.html")))
-        split.addWidget(self.map)
+        self.map_workspace = QWidget()
+        map_layout = QGridLayout(self.map_workspace)
+        map_layout.setContentsMargins(0, 0, 0, 0)
+        map_layout.addWidget(self.map, 0, 0)
+        # The map fills the cell beneath the floating controls.
+        self.floating_actions = QScrollArea()
+        self.floating_actions.setObjectName('toolbar')
+        self.floating_actions.setWidgetResizable(True)
+        self.floating_actions.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.floating_actions.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.floating_actions.setWidget(self.action_toolbar)
+        self.floating_actions.setFixedHeight(self.action_toolbar.sizeHint().height() + 22)
+        overlay = QVBoxLayout()
+        overlay.setContentsMargins(16, 0, 16, 28)
+        overlay.addStretch(1)
+        overlay.addWidget(self.floating_actions)
+        map_layout.addLayout(overlay, 0, 0)
+        self.floating_actions.raise_()
+        split.addWidget(self.map_workspace)
         split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 1)
         split.setCollapsible(1, False)
@@ -242,7 +259,7 @@ class WindowUiMixin(RoutePanelMixin):
         if not hasattr(self, 'map'):
             return
         # Give the combined editor the full workspace on smaller displays.
-        self.map.setVisible(not (self.tabs.isVisible() and self.tabs.currentIndex() == 1 and self.width() < 1100))
+        self.map_workspace.setVisible(not (self.tabs.isVisible() and self.tabs.currentIndex() == 1 and self.width() < 1100))
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

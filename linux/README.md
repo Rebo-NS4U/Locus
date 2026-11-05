@@ -14,7 +14,7 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 - A compact workspace menu in the top toolbar opens Places, Routes, Movement,
   Map and Settings without reserving a vertical navigation column.
   Phone selection and device tools have their own toolbar. Location and route
-  actions share a persistent toolbar: Set location, Plan, Start, Pause, Resume,
+  actions share a floating toolbar over the bottom of the map: Set location, Plan, Start, Pause, Resume,
   Stop here, Continue from stop (when waiting), and Restore. Stop here ends
   movement at the current simulated position; Start begins the route again.
   Each workspace has a heading and a short description of its controls.
@@ -28,7 +28,8 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   windows narrower than 1100 pixels it uses the full workspace. Hide Controls
   to return to the map. Narrow editor panes stack the trip and settings.
   The route name, Save, file menu and playback status stay fixed.
-  Playback buttons remain in the main toolbar even with Controls hidden. Idle playback
+  Playback buttons float above the map even with Controls hidden. On narrow maps,
+  scroll the bar horizontally to reach every action. Idle playback
   status uses one line and expands for movement or traffic details.
   New route and file actions live in Route ⋯.
   Its Trip options section contains There and back, Loop route and Show return stops.
