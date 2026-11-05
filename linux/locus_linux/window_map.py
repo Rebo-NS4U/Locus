@@ -60,6 +60,13 @@ class MapInteractionMixin:
             item = self.route_list.item(row)
             active = row in rows
             item.setBackground(QBrush(color) if active else QBrush())
+            card = self.route_list.itemWidget(item)
+            if card:
+                # Item widgets cover the native item paint on some Qt themes.
+                # Put the playback indicator on the visible card itself.
+                border = self.colors['accent'] if active else 'transparent'
+                card.setProperty('activeLeg', active)
+                card.setStyleSheet(f'QFrame#stopCard {{ border: 2px solid {border}; border-radius: 8px; }}')
             font = item.font()
             font.setBold(active)
             item.setFont(font)

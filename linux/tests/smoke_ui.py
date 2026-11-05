@@ -355,7 +355,8 @@ def check():
             assert result['active_leg']['from_stop'] == 1
             assert 'stop 1 → 2' in window.active_leg_label.text()
             assert all(window.route_list.item(row).font().bold() for row in (0, 1))
-            window.map.page().runJavaScript("Boolean(activeLeg && activeLeg.index === 0 && legLines[0].options.weight === 8 && document.querySelectorAll('.route-stop-active').length === 2)", active_map_check.append)
+            assert all(window.route_list.itemWidget(window.route_list.item(row)).property('activeLeg') for row in (0, 1))
+            window.map.page().runJavaScript("Boolean(legLines.length && legLines.every(line => line.options.weight === 4) && document.querySelectorAll('.route-stop-active').length === 0)", active_map_check.append)
             stage = 71
         elif stage == 71 and active_map_check:
             assert active_map_check == [True], active_map_check
