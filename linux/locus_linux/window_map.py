@@ -16,7 +16,7 @@ from .units import to_mph, to_kph, speed_text, METRES_PER_MILE
 class MapInteractionMixin:
     def motion_changed(self, state):
         self.motion = state
-        self.highlight_active_leg(state.get("active_leg"))
+        self.highlight_active_leg(state.get("active_leg"), planned_stop=state.get("planned_stop"))
         self.connection_badge.setText(("Demo session" if self.demo else "Location active") if state["connected"] else "Location unknown / inactive")
         self.connection_badge.setStyleSheet(f"color: {self.colors['accent'] if state['connected'] else self.colors['muted']};")
         self.js("setAcknowledged", state["position"], state["connected"])
@@ -39,8 +39,12 @@ class MapInteractionMixin:
             self.connection_badge.setText(f"{label} · {stop['remaining']:.0f}s")
             self.progress.setText(self.progress.text() + f"\n{label}: {stop['remaining']:.1f}s remaining")
 
-    def highlight_active_leg(self, leg, force=False):
-        signature = (leg['index'], leg['from_stop'], leg['to_stop']) if leg else None
+    def highlight_active_leg(self, leg, force=False, planned_stop=None):
+        destination = planned_stop['stop'] if planned_stop else leg['to_stop'] if leg else None
+        row = destination - 1 if destination is not None else None
+        if leg and self.return_edit.isChecked():
+            row = 0 if planned_stop and planned_stop['distance'] == 0 else leg['index'] + 1
+        signature = (leg['index'] if leg else None, row, bool(planned_stop))
         if signature == self.active_leg_signature and not force:
             return
         self.active_leg_signature = signature
@@ -48,12 +52,10 @@ class MapInteractionMixin:
         self.active_leg_label.setVisible(bool(leg))
         if leg:
             self.active_leg_label.setText(f"Active: stop {leg['from_stop']} → {leg['to_stop']} · {leg.get('mode', '')}")
-        rows = set()
-        if leg:
-            if self.return_edit.isChecked():
-                rows = {leg['index'], leg['index'] + 1}
-            else:
-                rows = {leg['from_stop'] - 1, leg['to_stop'] - 1}
+        rows = {row} if row is not None else set()
+        if row is not None and 0 <= row < self.route_list.count():
+            self.route_list.setCurrentRow(row)
+            self.route_list.scrollToItem(self.route_list.item(row))
         color = QColor(self.colors['accent'])
         color.setAlpha(70)
         for row in range(self.route_list.count()):

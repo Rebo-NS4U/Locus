@@ -142,7 +142,7 @@ class RouteEditorMixin:
             self.route_list.setCurrentRow(min(selected_row, self.route_list.count() - 1))
         self.route_list.blockSignals(False)
         self.select_segment(self.selected_segment())
-        self.highlight_active_leg(self.motion.get("active_leg"), force=True)
+        self.highlight_active_leg(self.motion.get("active_leg"), force=True, planned_stop=self.motion.get("planned_stop"))
         self.rebuild_route()
         self.remember_route_draft()
 

@@ -66,9 +66,38 @@ class RouteCardTests(unittest.TestCase):
             editor.add_stop_card(i + 1, f'Stop {i + 1}', '', '', '')
         cards = [editor.route_list.itemWidget(editor.route_list.item(i)) for i in range(3)]
         editor.highlight_active_leg({'index': 0, 'from_stop': 1, 'to_stop': 2})
-        self.assertEqual([card.property('activeLeg') for card in cards], [True, True, False])
-        self.assertIn('#ffb77e', cards[0].styleSheet())
+        self.assertEqual([card.property('activeLeg') for card in cards], [False, True, False])
+        self.assertIn('#ffb77e', cards[1].styleSheet())
         editor.highlight_active_leg({'index': 1, 'from_stop': 2, 'to_stop': 3})
-        self.assertEqual([card.property('activeLeg') for card in cards], [False, True, True])
+        self.assertEqual([card.property('activeLeg') for card in cards], [False, False, True])
+        self.assertEqual(editor.route_list.currentRow(), 2)
         editor.highlight_active_leg(None)
         self.assertEqual([card.property('activeLeg') for card in cards], [False, False, False])
+
+    def test_waiting_at_start_then_following_destination(self):
+        editor = Editor()
+        for i in range(3):
+            editor.add_stop_card(i + 1, f'Stop {i + 1}', '', '', '')
+        leg = {'index': 0, 'from_stop': 1, 'to_stop': 2}
+        editor.highlight_active_leg(leg, planned_stop={'stop': 1, 'distance': 0})
+        self.assertEqual(editor.route_list.currentRow(), 0)
+        editor.highlight_active_leg(leg)
+        self.assertEqual(editor.route_list.currentRow(), 1)
+        editor.highlight_active_leg(leg, planned_stop={'stop': 2, 'distance': 100})
+        self.assertEqual(editor.route_list.currentRow(), 1)
+
+    def test_return_leg_selects_destination_visit_or_original_card(self):
+        editor = Editor()
+        for i, stop in enumerate([1, 2, 3, 2, 1]):
+            editor.add_stop_card(stop, f'Stop {stop}', '', '', '')
+        leg = {'index': 2, 'from_stop': 3, 'to_stop': 2}
+        editor.highlight_active_leg(leg)
+        self.assertEqual(editor.route_list.currentRow(), 1)
+        editor.return_edit.setChecked(True)
+        editor.highlight_active_leg(leg, force=True)
+        self.assertEqual(editor.route_list.currentRow(), 3)
+        leg = {'index': 3, 'from_stop': 2, 'to_stop': 1}
+        editor.highlight_active_leg(leg)
+        self.assertEqual(editor.route_list.currentRow(), 4)
+        editor.highlight_active_leg(None)
+        self.assertFalse(any(editor.route_list.itemWidget(editor.route_list.item(i)).property('activeLeg') for i in range(5)))

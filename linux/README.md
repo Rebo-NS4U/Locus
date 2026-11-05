@@ -100,8 +100,9 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   as an estimate. Manual speed overrides are available per segment. This estimates
   simulated movement; it does not sense the phone's actual vehicle speed or live traffic.
 - During playback, the active leg is emphasized on the map and its two numbered
-  stops are highlighted in both the map and the route list, including the return
-  leg of a There and back trip. A status label shows the current stop pair.
+  stops are highlighted on the map. The route editor selects, scrolls to and
+  highlights the destination stop, or the current stop during a planned wait,
+  including the return leg of a There and back trip. A status label shows the current stop pair.
 - Driving occasionally yields at mapped crosswalks: a 30% chance of a 2–8 second
   pause. Simulated red-light stops queue 3–20 metres before the signal when space
   permits; queues stay within the current vehicle leg and do not pass earlier
