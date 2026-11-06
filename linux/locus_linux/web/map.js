@@ -12,7 +12,9 @@ window.setTheme = colors => {
 };
 window.setOptions = (night, shouldFollow) => {
   document.body.classList.toggle('night', night);
+  const relock = shouldFollow && !follow;
   follow = shouldFollow;
+  if (relock && acknowledged) map.panTo(acknowledged.getLatLng(), {animate: true, duration: 0.3});
 };
 window.focusLocation = (lat, lon) => {
   map.panTo([lat, lon]);

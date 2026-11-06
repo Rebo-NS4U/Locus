@@ -10,6 +10,9 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   margin to keep its border visible. Press **F11** for optional fullscreen; activating an existing
   instance preserves its window mode.
 - The map opens at street-level zoom (16), with an empty working route.
+  A top-right **Lock camera to pin** toggle follows the moving location pin;
+  turn it off to browse freely. Turning it back on recenters immediately.
+  It stays synchronized with Controls → Map → Follow movement.
 - Settings → Map opening location saves the starting map coordinates. Routes
   can save a single point; reopen it and press **Start** to set that location.
 - A compact workspace menu in the top toolbar opens Places, Routes, Movement,
