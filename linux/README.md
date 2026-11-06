@@ -9,7 +9,7 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 - Opens as a normal window spanning the desktop's available area with a 12-pixel
   margin to keep its border visible. Press **F11** for optional fullscreen; activating an existing
   instance preserves its window mode.
-- The map opens at street-level zoom (16), including when restoring a route draft.
+- The map opens at street-level zoom (16), with an empty working route.
 - Settings → Map opening location saves the starting map coordinates. Routes
   can save a single point; reopen it and press **Start** to set that location.
 - A compact workspace menu in the top toolbar opens Places, Routes, Movement,
@@ -130,12 +130,13 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   Timers freeze while the route is paused. Clock waits use the computer's local
   time; after sleep or a disconnect, explicit Resume is still required. First and
   final pins can have waits, and looping routes repeat their planned stops.
-  Stop rules survive draft recovery, library saves and project import/export;
+  Stop rules survive library saves and project import/export;
   GPX files do not carry departure rules. Waiting keeps location refresh active.
 - A built-in route library with named saves, search, open, rename and delete.
   Save updates the current route; **Save a copy to library** keeps a separate copy.
   Walking/driving/cycling settings and imported GPX tracks are retained. The current
-  working draft is saved automatically and restored on launch, without starting playback.
+  working route starts empty on every launch; open a saved route from the library
+  when you want to use it again.
 - A refreshed map-first route editor with a visible route name and Save action,
   a separate library view, quieter selection colors and always-reachable playback controls.
 - Colored, clickable segments with automatic path selection. Editable
@@ -229,8 +230,7 @@ Name the route and press **Save route** (Ctrl+S) to keep it inside Locus.
 **Saved routes** opens your searchable library; double-click a route or press
 **Open** to restore it. Rename and delete are available there. Opening editable
 routes restores their stops and settings; press **Plan** to rebuild paths with
-current map data. GPX tracks reopen with their exact geometry. The last working draft is
-restored automatically on startup. File import/export remains in **Route ⋯**.
+current map data. GPX tracks reopen with their exact geometry. The working route starts empty on startup; save routes you want to keep. File import/export remains in **Route ⋯**.
 The library is stored privately in `$XDG_STATE_HOME/locus-linux/routes.json`
 (default `~/.local/state/locus-linux/routes.json`); demo mode uses a separate library.
 Walking considers mapped sidewalks, trails, driveways and alleys with pedestrian
@@ -328,7 +328,7 @@ libraries and `desktop-file-utils` are still required, as in CI.
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/pip check
 .venv/bin/python tests/smoke_ui.py  # requires a graphical session
-.venv/bin/python tests/smoke_library.py  # GUI route-library recovery and GPX saves
+.venv/bin/python tests/smoke_library.py  # GUI empty startup, route library and GPX saves
 .venv/bin/python tests/smoke_startup.py  # desktop-sized normal launch and F11, with fake hardware
 .venv/bin/python tests/smoke_recovery.py  # corrupt state, visible errors and safe shutdown
 .venv/bin/python tests/smoke_map_cache.py  # local-server, cross-launch cache check

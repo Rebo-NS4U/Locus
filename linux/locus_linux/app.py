@@ -87,12 +87,8 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
         self.map.installEventFilter(self)
         QApplication.instance().focusChanged.connect(self.focus_changed)
         self.enable(False)
-        if self.route_library.data.get('draft'):
-            draft = dict(self.route_library.data)
-            self.route_title.setText(draft.get('draft_name') or 'Recovered draft')
-            identifier = draft.get('draft_route_id')
-            self.active_route_id = identifier if any(item['id'] == identifier for item in draft['routes']) else None
-            self.apply_route_document(draft['draft'])
+        # Each launch starts a new working route; named library saves remain available.
+        self.stops_changed()
         if self.state_warnings():
             self.status.setText(self.state_warnings())
         self.worker.start()

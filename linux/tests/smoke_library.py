@@ -1,4 +1,4 @@
-"""GUI route persistence and recovery without starting a phone worker."""
+"""GUI empty startup and saved route persistence without starting a phone worker."""
 import os
 import tempfile
 from pathlib import Path
@@ -27,6 +27,13 @@ library.save_draft(plan.serialize(), 'Campus', identifier)
 with patch.object(Worker, 'start'):
     first = Window(demo=True)
     first.busy = False
+    assert first.active_route_id is None
+    assert not first.stops and not first.route_points
+    assert not first.route_title.text()
+    assert not RouteLibrary(path).data['draft']['pins']
+    assert RouteLibrary(path).get(identifier)['name'] == 'Campus'
+    first.library_list.setCurrentRow(0)
+    first.open_library_route()
     assert first.active_route_id == identifier
     assert first.route_title.text() == 'Campus'
     assert len(first.stops) == 3
@@ -81,11 +88,13 @@ with patch.object(Worker, 'start'):
     first.ready = False
     second = Window(demo=True)
     second.busy = False
-    assert second.stops[0] == (35.0001, -111)
-    assert second.there_and_back.isChecked()
-    assert second.route_plan.there_and_back
-    assert second.route_title.text() == 'Campus'
-    assert second.route_plan.pins[1]['departure'] == {'mode': 'clock', 'time': '16:30'}
+    assert not second.stops and not second.route_points
+    assert not second.there_and_back.isChecked()
+    assert second.active_route_id is None
+    assert not second.route_title.text()
+    assert not RouteLibrary(path).data['draft']['pins']
+    assert RouteLibrary(path).get(identifier)['name'] == 'Campus'
+    second.apply_route_document(first.current_route_document())
     second.library_list.setCurrentRow(0)
     with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.Yes):
         second.delete_library_route()
@@ -115,4 +124,4 @@ with patch.object(Worker, 'start'):
         window.release_map()
 app.processEvents()
 root.cleanup()
-print('PASS: GUI restart recovery, autosaved edits, delete retains draft, imported GPX library roundtrip')
+print('PASS: GUI empty startup, saved route reopening, working edits, delete retains draft, imported GPX library roundtrip')
