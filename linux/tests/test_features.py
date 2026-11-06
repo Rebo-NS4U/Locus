@@ -99,6 +99,31 @@ class MotionTests(unittest.IsolatedAsyncioTestCase):
         await self.session.tick(1)
         self.assertEqual(count, len(self.transport.calls))
 
+    async def test_stop_here_keeps_position_and_discards_playback(self):
+        await self.session.start_route('phone', [(0, 0), (0, .01)], loop=True)
+        await self.session.tick(1)
+        held = self.session.target
+        result = await self.session.stop_here()
+        self.assertEqual(result['position'], held)
+        self.assertIsNone(self.session.route)
+        self.assertIsNone(self.session.departures)
+        self.assertIsNone(self.session.traffic)
+        self.assertFalse(self.session.loop_route)
+        self.assertEqual(self.session.mode, 'fixed')
+        await self.session.tick(1)
+        self.assertEqual(self.session.target, held)
+        self.assertEqual(self.session.snapshot()['total'], 0)
+        with self.assertRaises(ValueError):
+            await self.session.control('resume')
+
+    async def test_stop_here_without_location_preserves_route(self):
+        await self.session.start_route('phone', [(0, 0), (0, .01)])
+        route = self.session.route
+        self.session.target = None
+        with self.assertRaises(ValueError):
+            await self.session.stop_here()
+        self.assertIs(self.session.route, route)
+
     async def test_stop_route_holds_current_position_and_requires_restart(self):
         await self.session.start_route('phone', [(0, 0), (0, .01)])
         await self.session.tick(1)

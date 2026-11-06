@@ -53,7 +53,7 @@ class Worker(QThread):
                         if self.session.journal.exists():
                             raise ValueError("Restore the current session before changing device setup or transport.")
                         result = await getattr(self.transport, operation)(*args)
-                    elif operation in ("apply", "restore", "configure", "configure_traffic", "start_route", "control", "joystick"):
+                    elif operation in ("apply", "restore", "configure", "configure_traffic", "start_route", "control", "joystick", "stop_here"):
                         result = await getattr(self.session, operation)(*args)
                     elif operation in ("search", "mixed_route"):
                         result = await getattr(self.services, operation)(*args)

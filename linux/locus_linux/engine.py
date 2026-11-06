@@ -102,6 +102,18 @@ class Session:
             self.changed(self.snapshot())
         return "Following route. Pause holds the current location."
 
+    async def stop_here(self):
+        async with self.lock:
+            if self.target is None:
+                raise ValueError('Reconnect the phone before stopping at its simulated location.')
+            position = self.target
+            self.mode, self.vector, self.paused = 'fixed', (0, 0), False
+            self.route, self.traffic, self.departures = None, None, None
+            self.progress, self.motion_speed, self.loop_route = 0, 0, False
+            self.last_tick = time.monotonic()
+            self.changed(self.snapshot())
+            return {'position': position}
+
     async def control(self, action):
         async with self.lock:
             if action == 'depart':

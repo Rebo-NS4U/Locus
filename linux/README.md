@@ -9,6 +9,7 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
 - Opens as a normal window spanning the desktop's available area with a 12-pixel
   margin to keep its border visible. Press **F11** for optional fullscreen; activating an existing
   instance preserves its window mode.
+- The map opens at street-level zoom (16), including when restoring a route draft.
 - Settings → Map opening location saves the starting map coordinates. Routes
   can save a single point; reopen it and press **Start** to set that location.
 - A compact workspace menu in the top toolbar opens Places, Routes, Movement,
@@ -16,7 +17,8 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   Phone selection and device tools have their own toolbar. Location and route
   actions share a centered, content-sized floating toolbar over the bottom of the map: Set location, Plan, Start, Pause, Resume,
   Stop here, Continue from stop (when waiting), and Restore. Stop here ends
-  movement at the current simulated position; Start begins the route again.
+  movement at the current simulated position, selects it as the active location,
+  and clears the working route. Saved library routes are preserved.
   Each workspace has a heading and a short description of its controls.
 - Route studio combines stop cards and their settings in one resizable workspace.
   Compact cards show each numbered stop, wait rule and onward leg. Hover a card

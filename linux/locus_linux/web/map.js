@@ -1,4 +1,4 @@
-const map = L.map('map', {worldCopyJump: true, doubleClickZoom: false}).setView([40.7128, -74.006], 12);
+const map = L.map('map', {worldCopyJump: true, doubleClickZoom: false}).setView([40.7128, -74.006], 16);
 const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);

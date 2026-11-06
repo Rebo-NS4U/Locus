@@ -196,6 +196,15 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
                 self.status.setText("Route planned. Select a colored segment to change its travel mode.")
             except ValueError as error:
                 self.status.setText(speed_text(str(error)))
+        elif operation == 'stop_here':
+            self.select_coordinates(*result['position'])
+            self.selected_name = 'Stopped location'
+            self.active_route_id = None
+            self.route_title.clear()
+            self.route_plan.reset([])
+            self.stops_changed()
+            self.preview()
+            self.status.setText('Holding the current simulated location. Route cleared.')
         elif operation == "set_mode":
             self.devices.clear()
             self.status.setText(result)

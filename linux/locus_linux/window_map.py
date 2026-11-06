@@ -157,7 +157,7 @@ class MapInteractionMixin:
             if 'default_latitude' in settings or 'default_longitude' in settings:
                 self.js('focusLocation', settings.get('default_latitude', 40.7128), settings.get('default_longitude', -74.006))
             elif self.stops:
-                self.js("fitRoute()")
+                self.js('focusLocation', *self.stops[0])
 
     def map_typography(self):
         font = QApplication.instance().font()
