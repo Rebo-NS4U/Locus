@@ -176,7 +176,7 @@ class RoutePanelMixin:
         departure_layout.addLayout(timer_row)
         self.departure_time = DepartureTimePicker(QTime(9, 0))
         self.departure_time.setAccessibleName('Local departure time')
-        self.departure_time.setToolTip('Computer local time. If arrival is later, wait until tomorrow.')
+        self.departure_time.setToolTip('Computer local time. Arriving during this minute departs now; later minutes wait until tomorrow.')
         departure_layout.addWidget(self.departure_time)
         self.departure_seconds.hide()
         self.departure_unit.hide()

@@ -48,7 +48,9 @@ class DepartureSchedule:
             now = datetime.fromtimestamp(self.clock())
             hour, minute = map(int, self.waiting['time'].split(':'))
             target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            if target < now:
+            # The picker has minute precision: arrival anywhere in the selected
+            # minute is due now, rather than a missed departure tomorrow.
+            if target < now.replace(second=0, microsecond=0):
                 target += timedelta(days=1)
             # Naive local timestamp uses the OS time-zone rules for the target day.
             self.deadline = target.timestamp()

@@ -31,6 +31,16 @@ class DepartureTests(unittest.TestCase):
         scheduler.hold(999999)
         self.assertIsNotNone(scheduler.waiting)
 
+    def test_arriving_during_selected_minute_is_due_today(self):
+        for second in (0, 0.125, 30, 59.999):
+            now = datetime(2026, 11, 3, 15, 0).timestamp() + second
+            scheduler = DepartureSchedule(
+                [{'distance': 0, 'mode': 'clock', 'time': '15:00'}], lambda: now)
+            scheduler.arrive()
+            self.assertEqual(scheduler.remaining, 0)
+            scheduler.hold(0)
+            self.assertIsNone(scheduler.waiting)
+
     def test_saved_rules_follow_pins_and_assemble_at_correct_shape_indexes(self):
         plan = RoutePlan()
         plan.reset([(0, 0), (0, .001), (0, .002)])
@@ -104,6 +114,23 @@ class PlannedStopPlaybackTests(unittest.IsolatedAsyncioTestCase):
         await self.session.tick(1)
         self.assertEqual(self.session.target, self.points[1])
         self.now = deadline
+        await self.session.tick(1)
+        await self.session.tick(1)
+        self.assertEqual(self.session.target, self.points[-1])
+
+    async def test_clock_departs_when_system_time_reaches_selected_minute(self):
+        await self.start('clock', index=0, time='15:01')
+        await self.session.tick(1)
+        self.assertEqual(self.session.target, self.points[0])
+        self.now += 60.125
+        await self.session.tick(1)
+        self.assertIsNone(self.session.snapshot()['planned_stop'])
+        await self.session.tick(1)
+        self.assertEqual(self.session.target, self.points[-1])
+
+    async def test_clock_starting_during_selected_minute_does_not_wait_a_day(self):
+        self.now += .125
+        await self.start('clock', index=0, time='15:00')
         await self.session.tick(1)
         await self.session.tick(1)
         self.assertEqual(self.session.target, self.points[-1])
