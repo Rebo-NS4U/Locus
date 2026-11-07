@@ -135,6 +135,30 @@ class PlannedStopPlaybackTests(unittest.IsolatedAsyncioTestCase):
         await self.session.tick(1)
         self.assertEqual(self.session.target, self.points[-1])
 
+    async def test_clock_wait_stays_armed_after_delay_until_515_pm(self):
+        self.now = datetime(2026, 11, 3, 16, 0).timestamp()
+        await self.start('clock', index=0, time='17:15')
+        await self.session.tick(4)
+        self.assertFalse(self.session.paused)
+        self.now = datetime(2026, 11, 3, 17, 15).timestamp()
+        await self.session.tick(4500)
+        self.assertFalse(self.session.paused)
+        self.assertIsNone(self.session.snapshot()['planned_stop'])
+        await self.session.tick(1)
+        self.assertEqual(self.session.target, self.points[-1])
+
+    async def test_explicit_pause_still_blocks_clock_departure(self):
+        await self.start('clock', index=0, time='15:01')
+        await self.session.control('pause')
+        self.now += 120
+        await self.session.tick(120)
+        self.assertTrue(self.session.paused)
+        self.assertIsNotNone(self.session.snapshot()['planned_stop'])
+        await self.session.control('resume')
+        await self.session.tick(1)
+        await self.session.tick(1)
+        self.assertEqual(self.session.target, self.points[-1])
+
     async def test_start_and_final_pin_waits_and_loop_repeats(self):
         await self.start('manual', index=0)
         await self.session.tick(1)

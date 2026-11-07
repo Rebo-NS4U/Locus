@@ -271,7 +271,12 @@ class Session:
                 candidate = self.last_target
             else:
                 candidate = self.target
-                if elapsed > 3 and self.mode in ("route", "joystick"):
+                # A scheduled stop is already stationary. Keep its wall-clock
+                # departure armed through delayed updates, including sleep.
+                clock_wait = (self.mode == "route" and self.departures
+                              and self.departures.waiting
+                              and self.departures.waiting['mode'] == 'clock')
+                if elapsed > 3 and self.mode in ("route", "joystick") and not clock_wait:
                     self.paused, self.vector = True, (0, 0)
                     self.notify("Movement paused after a scheduling delay or sleep. Resume the route when ready.")
                 speed = self.speed * (random.uniform(0.9, 1.1) if self.variation else 1)
