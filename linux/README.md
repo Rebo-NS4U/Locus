@@ -131,7 +131,8 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   wait for a timer (1 second to 7 days), or depart at a local time of day, selected with themed hour, minute and AM/PM dropdowns in 12-hour time.
   If that time has passed on arrival, departure is scheduled for tomorrow.
   Timers freeze while the route is paused. Clock waits use the computer's local
-  time; after sleep or a disconnect, explicit Resume is still required. First and
+  time and stay armed through sleep or delayed updates while waiting at a clock
+  stop. Explicit Pause and phone disconnects still require Resume. First and
   final pins can have waits, and looping routes repeat their planned stops.
   Stop rules survive library saves and project import/export;
   GPX files do not carry departure rules. Waiting keeps location refresh active.
@@ -260,7 +261,8 @@ check Maps. A lost connection always leaves location uncertain.
 Automatic reconnection, when enabled, retries only the same phone at the last
 requested location, at most once every five seconds after failure. A route stays
 paused after reconnection. Sleep or a scheduling delay pauses movement rather
-than jumping forward. Routes are not automatically resumed after app restart.
+than jumping forward, except that clock-based waits stay armed at their stop.
+Routes are not automatically resumed after app restart.
 Looping intentionally restarts at the first point after reaching the last point;
 use a closed route if you want a continuous circuit.
 

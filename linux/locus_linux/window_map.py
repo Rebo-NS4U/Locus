@@ -32,6 +32,8 @@ class MapInteractionMixin:
                 label += f"{planned['remaining']:.0f}s remaining"
             else:
                 label += 'departure ' + datetime.fromtimestamp(planned['deadline']).strftime('%a %I:%M %p')
+            if state['paused']:
+                label += ' · Paused — Resume required'
             self.progress.setText(label)
         if state.get('traffic_stop'):
             stop = state['traffic_stop']
