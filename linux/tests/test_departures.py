@@ -3,6 +3,8 @@ import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from locus_linux.departures import departure, DepartureSchedule
 from locus_linux.engine import Session
@@ -158,6 +160,38 @@ class PlannedStopPlaybackTests(unittest.IsolatedAsyncioTestCase):
         await self.session.tick(1)
         await self.session.tick(1)
         self.assertEqual(self.session.target, self.points[-1])
+
+    async def test_slow_phone_ack_after_clock_departure_does_not_pause_route(self):
+        await self.session.configure(1, False, False)
+        await self.start('clock', index=0, time='15:01')
+        self.session.refresh.cancel()
+        await asyncio.gather(self.session.refresh, return_exceptions=True)
+        monotonic = 100.0
+        self.session.last_tick = monotonic
+        self.now += 59
+        sleeps = 0
+
+        async def sleep(seconds):
+            nonlocal monotonic, sleeps
+            sleeps += 1
+            if sleeps > 2:
+                raise asyncio.CancelledError()
+            monotonic += seconds
+            self.now += seconds
+
+        async def slow_set(*args):
+            nonlocal monotonic
+            monotonic += 4
+            self.now += 4
+
+        self.transport.set = slow_set
+        with patch('locus_linux.engine.time', SimpleNamespace(monotonic=lambda: monotonic)), \
+                patch('locus_linux.engine.asyncio.sleep', sleep):
+            with self.assertRaises(asyncio.CancelledError):
+                await self.session.keep_alive()
+        self.assertFalse(self.session.paused)
+        self.assertIsNone(self.session.snapshot()['planned_stop'])
+        self.assertGreater(self.session.progress, 0)
 
     async def test_start_and_final_pin_waits_and_loop_repeats(self):
         await self.start('manual', index=0)

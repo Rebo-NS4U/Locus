@@ -220,10 +220,13 @@ class Session:
 
     async def keep_alive(self):
         while True:
+            sleep_started = time.monotonic()
             await asyncio.sleep(1)
             now = time.monotonic()
             elapsed, self.last_tick = now - self.last_tick, now
-            await self.tick(elapsed, now)
+            # Phone acknowledgements can be slow without the event loop sleeping.
+            # Only the wake-up delay should trigger the sleep/scheduling safeguard.
+            await self.tick(elapsed, now, scheduling_delay=now - sleep_started)
 
     def smooth_variation(self, duration, limited):
         if not self.variation:
@@ -260,7 +263,7 @@ class Session:
         if 0 <= stop_at - self.progress <= 1e-8:
             self.progress = stop_at
 
-    async def tick(self, elapsed, now=None):
+    async def tick(self, elapsed, now=None, *, scheduling_delay=None):
         from .routes import offset
         now = time.monotonic() if now is None else now
         async with self.lock:
@@ -276,7 +279,8 @@ class Session:
                 clock_wait = (self.mode == "route" and self.departures
                               and self.departures.waiting
                               and self.departures.waiting['mode'] == 'clock')
-                if elapsed > 3 and self.mode in ("route", "joystick") and not clock_wait:
+                delay = elapsed if scheduling_delay is None else scheduling_delay
+                if delay > 3 and self.mode in ("route", "joystick") and not clock_wait:
                     self.paused, self.vector = True, (0, 0)
                     self.notify("Movement paused after a scheduling delay or sleep. Resume the route when ready.")
                 speed = self.speed * (random.uniform(0.9, 1.1) if self.variation else 1)

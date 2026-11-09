@@ -137,6 +137,8 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   time and stay armed through sleep or delayed updates while waiting at a clock
   stop. Explicit Pause and phone disconnects still require Resume. First and
   final pins can have waits, and looping routes repeat their planned stops.
+  Slow phone acknowledgements do not trigger the scheduling-delay pause;
+  actual sleep or delayed background wake-ups still pause moving routes.
   Stop rules survive library saves and project import/export;
   GPX files do not carry departure rules. Waiting keeps location refresh active.
 - A built-in route library with named saves, search, open, rename and delete.
