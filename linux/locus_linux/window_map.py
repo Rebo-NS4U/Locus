@@ -130,10 +130,7 @@ class MapInteractionMixin:
 
     def pick(self, latitude, longitude):
         self.select_coordinates(latitude, longitude)
-        if self.insert_pins.isChecked():
-            self.insert_stop()
-        else:
-            self.add_stop()
+        self.add_stop()
 
     def js(self, function, *args):
         if not self.map_loaded:

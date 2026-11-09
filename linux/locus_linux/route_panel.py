@@ -135,9 +135,6 @@ class RoutePanelMixin:
         row.addWidget(stop_actions)
         row.addStretch()
         stops_box.addLayout(row)
-        self.insert_pins = QCheckBox('Insert after selected stop')
-        self.insert_pins.setToolTip('Select a stop, then click the map to insert pins after it. Uncheck to append pins again.')
-        stops_box.addWidget(self.insert_pins)
 
         details = QWidget()
         details_box = QVBoxLayout(details)
