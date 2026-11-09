@@ -82,7 +82,10 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   long sidewalk detours. The shortest returned walking alternative is selected. A direct connection
   of up to 300 metres (984 ft) is used only when no mapped walking route is found.
   Each segment keeps its own travel mode, speed policy and alternatives. Insert a pin to split a
-  segment and inherit its settings. Existing route projects remain compatible.
+  segment and inherit its settings. In the route editor, enable **Insert after selected stop**,
+  select a stop card, then click the map to place new pins between existing stops.
+  Each inserted pin becomes selected so repeated clicks extend that section in order.
+  Uncheck the option to append pins again. Existing route projects remain compatible.
 - Mapped walking excludes ferries and requires connected path geometry. Off-path
   pins connect to that geometry without replacing the entire walking leg with a
   straight shortcut. Map coverage determines the available mapped paths. GPX supports exact geometry.
