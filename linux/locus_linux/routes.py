@@ -195,9 +195,9 @@ def parse_gpx(data):
     return Route(points).points
 
 
-def export_gpx(points, name="Locus route"):
+def export_gpx(points, name="Exora route"):
     route = Route(points)
-    root = ET.Element("gpx", version="1.1", creator="Locus Linux", xmlns="http://www.topografix.com/GPX/1/1")
+    root = ET.Element("gpx", version="1.1", creator="Exora", xmlns="http://www.topografix.com/GPX/1/1")
     track = ET.SubElement(root, "trk")
     ET.SubElement(track, "name").text = name
     segment = ET.SubElement(track, "trkseg")

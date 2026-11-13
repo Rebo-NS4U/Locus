@@ -8,7 +8,7 @@ from pathlib import Path
 
 def install_launcher(data_home=None, executable=None):
     data = Path(data_home) if data_home else Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
-    executable = str(executable or Path(sys.prefix) / "bin/locus-linux")
+    executable = str(executable or Path(sys.prefix) / "bin/exora")
     if any(c in executable for c in "\n\r"):
         raise ValueError("Unsupported executable path")
     quoted = '"' + executable.replace('\\', '\\\\').replace('"', '\\"').replace('`', '\\`').replace('$', '\\$').replace('%', '%%') + '"'
@@ -20,6 +20,6 @@ def install_launcher(data_home=None, executable=None):
     desktop = applications / "locus-linux.desktop"
     # The shell may preload a helper linked to system Qt. PySide ships its
     # own Qt, so inheriting that helper fails before Python can start.
-    desktop.write_text("[Desktop Entry]\nType=Application\nName=Locus Linux\nComment=iPhone location simulation, routes and joystick\n"
+    desktop.write_text("[Desktop Entry]\nType=Application\nName=Exora\nComment=iPhone location simulation, routes and joystick\n"
                        f"Exec=env -u LD_PRELOAD {quoted}\nIcon=locus-linux\nTerminal=false\nCategories=Utility;\nStartupWMClass=locus-linux\n")
     return desktop

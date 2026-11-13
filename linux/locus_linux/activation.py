@@ -38,5 +38,5 @@ def listen_for_activation(name, window):
 
     server.newConnection.connect(show_window)
     if not server.listen(name):
-        raise RuntimeError("Cannot listen for Locus activation: " + server.errorString())
+        raise RuntimeError("Cannot listen for Exora activation: " + server.errorString())
     return server

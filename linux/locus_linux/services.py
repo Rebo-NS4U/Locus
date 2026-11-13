@@ -55,7 +55,7 @@ def decode_shape(shape):
 
 def request_json(url, params):
     import requests
-    options = {"headers": {"User-Agent": "LocusLinux/0.4 (https://github.com/Rebo-NS4U/Locus)", "Accept": "application/json"}, "timeout": (5, 15), "stream": True}
+    options = {"headers": {"User-Agent": "Exora/0.4 (https://github.com/Rebo-NS4U/Locus)", "Accept": "application/json"}, "timeout": (5, 15), "stream": True}
     if 'data' in params:
         options['timeout'] = (5, 35)  # Allow the public Overpass queue plus its bounded query time.
     response = requests.post(url, json=params["_json_body"], **options) if "_json_body" in params else requests.get(url, params=params, **options)

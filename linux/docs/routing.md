@@ -75,7 +75,7 @@ per free segment, and fifty thousand combined playback points. Walking stops
 connect directly to the mapped path without an endpoint distance limit, including
 when only one stop is off-path. For walking,
 when every returned path snaps both stops more than two meters from their requested
-positions, Locus assumes a direct off-road connection between the stops, following
+positions, Exora assumes a direct off-road connection between the stops, following
 any added bends. The segment details identify this direct connection. Automatic
 speed uses the off-road walking estimate; manual speed is preserved. This does
 not check terrain or barriers. Running retains its two-meter endpoint limit. Routing failures still report an error;
@@ -89,7 +89,7 @@ movement keep their exact geometry and do not check water or barriers.
 
 ## Automatic driving speed
 
-When an automatic car segment is planned, Locus requests Valhalla's mapped edge
+When an automatic car segment is planned, Exora requests Valhalla's mapped edge
 speeds, posted limits, road classification and surface data. It caps the target by
 an available posted limit and slows for rough surfaces. If road speed is absent
 but classification exists, it uses a labeled road-class estimate. If metadata
@@ -174,7 +174,7 @@ still requires a path with at least two points.
 Settings → Map opening location chooses the starting map coordinates for the
 next launch. Use selected map coordinates copies the location selected in the
 Map section; Save settings persists it. This preference only centers the map
-and never sets the phone's location automatically. Locus opens as a normal,
+and never sets the phone's location automatically. Exora opens as a normal,
 resizable window spanning the available desktop with a 12-pixel outer margin.
 
 **Save route project** writes an editable `.locus.json` file containing pins,
@@ -183,7 +183,7 @@ restores those definitions; plan again to regenerate current paths and speed dat
 Alternative geometries are not frozen into the project. Projects are local files
 and are sent nowhere unless their segments are subsequently planned online.
 
-**Export GPX** writes the selected combined geometry. GPX does not retain Locus's
+**Export GPX** writes the selected combined geometry. GPX does not retain Exora's
 profiles or speed policies. Imported GPX plays at the global Move speed; use its
 GPX export to preserve it rather than saving an endpoint-only route project.
 

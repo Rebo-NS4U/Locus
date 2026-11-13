@@ -130,7 +130,7 @@ class IPhoneTransport:
             if not phone.paired:
                 raise RuntimeError("Unlock the phone and accept Trust This Computer.")
             if Version(phone.product_version) < Version("17.4"):
-                raise RuntimeError("Locus Linux requires iOS 17.4 or newer.")
+                raise RuntimeError("Exora requires iOS 17.4 or newer.")
             if not await phone.get_developer_mode_status():
                 raise RuntimeError("Enable Developer Mode in Settings → Privacy & Security.")
             async with PersonalizedImageMounter(phone) as mounter:

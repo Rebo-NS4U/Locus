@@ -26,5 +26,5 @@ def create_map_profile(parent, *, demo=False):
     profile.setHttpCacheMaximumSize(256 * 1024 * 1024)
     profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.NoPersistentCookies)
     profile.setPersistentPermissionsPolicy(QWebEngineProfile.PersistentPermissionsPolicy.StoreInMemory)
-    profile.setHttpUserAgent(profile.httpUserAgent() + " LocusLinux/0.4 (+https://github.com/Rebo-NS4U/Locus)")
+    profile.setHttpUserAgent(profile.httpUserAgent() + " Exora/0.4 (+https://github.com/Rebo-NS4U/Locus)")
     return profile

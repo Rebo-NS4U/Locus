@@ -18,6 +18,10 @@ def check_launch():
     app = QApplication.instance()
     app.processEvents()
     window = next(widget for widget in app.topLevelWidgets() if isinstance(widget, Window))
+    assert window.windowTitle() == 'Exora — DEMO'
+    assert window.tray.toolTip() == 'Exora'
+    assert app.applicationName() == 'Exora'
+    assert app.desktopFileName() == 'locus-linux'
     assert not window.isFullScreen() and not window.isMaximized(), 'Launch as a normal window'
     expected_size = opening_geometry(window.screen().availableGeometry()).size().expandedTo(window.minimumSize())
     assert window.size() == expected_size, 'Leave a visible border around the desktop-sized window'
@@ -31,7 +35,7 @@ def check_launch():
     return 0
 
 
-with patch.object(Worker, 'start'), patch.object(sys, 'argv', ['locus-linux', '--demo']), \
+with patch.object(Worker, 'start'), patch.object(sys, 'argv', ['exora', '--demo']), \
         patch.object(QApplication, 'exec', side_effect=check_launch):
     assert main() == 0
 print('PASS: startup fills the available desktop as a normal window; optional F11 toggle works')

@@ -266,7 +266,7 @@ class RoutePlan:
     @classmethod
     def deserialize(cls, value):
         if value.get("format") != "locus-route" or value.get("version") != 1:
-            raise ValueError("Not a supported Locus route project")
+            raise ValueError("Not a supported Exora route project")
         pins, legs = value.get("pins", []), value.get("legs", [])
         if not 1 <= len(pins) <= MAX_PINS or len(legs) != len(pins) - 1:
             raise ValueError(f"Project needs 1–{MAX_PINS} pins and one setting per segment")

@@ -81,7 +81,7 @@ def check():
             assert profile.httpCacheType() == profile.HttpCacheType.DiskHttpCache
             assert profile.httpCacheMaximumSize() == 256 * 1024 * 1024
             assert profile.cachePath() == directory.name + '/cache/locus-linux/demo-map/http'
-            assert 'LocusLinux/' in profile.httpUserAgent()
+            assert 'Exora/' in profile.httpUserAgent()
             assert window.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
             # The shell must retain alpha for compositor blur, while controls
             # and map content remain fully readable (no whole-window opacity).

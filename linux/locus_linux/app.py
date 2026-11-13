@@ -32,7 +32,7 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
         self.demo = demo
         self.colors = apply_theme(QApplication.instance())
         self.font_stamp = 0
-        self.setWindowTitle("Locus for Linux" + (" — DEMO" if demo else ""))
+        self.setWindowTitle("Exora" + (" — DEMO" if demo else ""))
         self.setWindowIcon(QIcon(str(Path(__file__).parent / "web/locus.svg")))
         self.resize(1440, 920)
         self.setMinimumSize(900, 600)
@@ -70,7 +70,7 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
         self.follow.setChecked(preferences.get("follow", True))
         self.sidebar_toggle.setChecked(preferences.get("sidebar_visible", False))
         self.tray = QSystemTrayIcon(self.windowIcon(), self)
-        self.tray.setToolTip("Locus for Linux")
+        self.tray.setToolTip("Exora")
         if QSystemTrayIcon.isSystemTrayAvailable():
             self.tray.show()
         self.worker.ready.connect(self.started)
@@ -113,7 +113,7 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
             self.setup_dialog.raise_()
             return
         self.setup_dialog = QDialog(self)
-        self.setup_dialog.setWindowTitle("Set up Locus")
+        self.setup_dialog.setWindowTitle("Set up Exora")
         self.setup_dialog.resize(560, 480)
         layout = QVBoxLayout(self.setup_dialog)
         for title, body in [
@@ -234,7 +234,7 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
     def interrupted(self, message):
         self.status.setText(message)
         if self.notifications.isChecked() and not self.isActiveWindow() and self.tray.isVisible():
-            self.tray.showMessage("Locus connection", message, QSystemTrayIcon.MessageIcon.Warning, 8000)
+            self.tray.showMessage("Exora connection", message, QSystemTrayIcon.MessageIcon.Warning, 8000)
 
 
     def save_settings(self):
@@ -275,7 +275,7 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
 
 def main():
     configure_map_browser()
-    parser = argparse.ArgumentParser(description="Locus native Linux desktop")
+    parser = argparse.ArgumentParser(description="Exora native Linux desktop")
     parser.add_argument("--demo", action="store_true", help="Use fake hardware; sends no phone commands")
     parser.add_argument("--install-launcher", action="store_true", help="Install an application-menu entry for this environment")
     options = parser.parse_args()
@@ -284,9 +284,9 @@ def main():
         print(install_launcher())
         return 0
     app = QApplication(sys.argv[:1])
-    app.setApplicationName("Locus Linux")
+    app.setApplicationName("Exora")
     app.setDesktopFileName("locus-linux")
-    app.setOrganizationName("Locus")
+    app.setOrganizationName("Exora")
     state = state_directory()
     state.mkdir(parents=True, exist_ok=True, mode=0o700)
     lock = QLockFile(str(state / ("demo.lock" if options.demo else "app.lock")))
@@ -294,7 +294,7 @@ def main():
     if not lock.tryLock(0):
         if activate_existing(activation_name):
             return 0
-        QMessageBox.information(None, "Locus is already open", "Switch to the existing Locus window to manage your iPhone.")
+        QMessageBox.information(None, "Exora is already open", "Switch to the existing Exora window to manage your iPhone.")
         return 1
     window = Window(options.demo)
     window.activation_server = listen_for_activation(activation_name, window)

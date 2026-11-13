@@ -153,7 +153,7 @@ class RouteLibraryMixin:
             data = self.route_plan.serialize()
             if not data["pins"]:
                 raise ValueError("Add at least one pin before saving a project")
-            path, _ = QFileDialog.getSaveFileName(self, "Save editable route", "route.locus.json", "Locus route (*.locus.json)")
+            path, _ = QFileDialog.getSaveFileName(self, "Save editable route", "route.locus.json", "Exora route (*.locus.json)")
             if path:
                 Path(path).write_text(json.dumps(data, indent=2))
                 self.status.setText("Route project saved with stops, travel modes and speed choices.")
@@ -163,7 +163,7 @@ class RouteLibraryMixin:
     def load_project(self):
         if not self.editable_route():
             return
-        path, _ = QFileDialog.getOpenFileName(self, "Load editable route", "", "Locus route (*.locus.json)")
+        path, _ = QFileDialog.getOpenFileName(self, "Load editable route", "", "Exora route (*.locus.json)")
         if path:
             try:
                 if Path(path).stat().st_size > 8_000_000:

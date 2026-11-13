@@ -1,6 +1,10 @@
-# Locus for Linux 0.4
+# Exora 0.4
 
 A native PySide6/Qt desktop companion to the original Locus iPhone application.
+
+Exora was previously named Locus for Linux. Existing `locus-linux` commands,
+state/cache paths, desktop IDs and `.locus.json` route files remain compatible;
+the current launcher command is `exora`.
 It controls a connected iPhone; it does not change the Linux computer's location.
 No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementation.
 
@@ -49,7 +53,7 @@ No sideloaded iPhone app or LocalDevVPN is needed for this desktop implementatio
   states and focus border. Corner rounding and surface mode read from
   `~/.config/rebos_shell/config/theme.json`, with safe defaults when unavailable.
   Palette and font continue to follow the Qt6ct export. Shell button settings
-  refresh while Locus is open; Quickshell configuration is only read.
+  refresh while Exora is open; Quickshell configuration is only read.
 - Glass desktop redesign with a translucent rounded shell, inset action bar,
   soft sidebar cards, pill controls, slim scrollbars and frosted map overlays.
   Native window transparency uses the compositor’s background blur when enabled
@@ -200,7 +204,7 @@ From this directory, run the per-user installer:
 ./install.sh
 ```
 
-It creates `.venv`, installs the package and adds **Locus Linux** to the application
+It creates `.venv`, installs the package and adds **Exora** to the application
 menu. The desktop entry clears inherited `LD_PRELOAD` libraries so shell helpers
 linked to system Qt cannot conflict with PySide’s bundled Qt. It does not install
 system packages, change desktop configuration or start phone simulation. Keep this checkout and its virtual environment at the same
@@ -211,11 +215,11 @@ Manual installation and demo:
 ```sh
 python3 -m venv .venv
 .venv/bin/pip install -e .
-.venv/bin/locus-linux --demo
+.venv/bin/exora --demo
 # Real hardware:
-.venv/bin/locus-linux
+.venv/bin/exora
 # Optional menu entry:
-.venv/bin/locus-linux --install-launcher
+.venv/bin/exora --install-launcher
 ```
 
 ## iPhone setup
@@ -235,7 +239,7 @@ choose **Walking**, **Driving** or **Cycling** for each segment, then press
 automatically, and failed or outdated plans wait for you to press **Plan** again.
 Select a numbered stop and use **Departure from stop** to set its wait rule.
 During a manual wait, press **Continue from stop**; timed stops leave automatically.
-Name the route and press **Save route** (Ctrl+S) to keep it inside Locus.
+Name the route and press **Save route** (Ctrl+S) to keep it inside Exora.
 **Saved routes** opens your searchable library; double-click a route or press
 **Open** to restore it. Rename and delete are available there. Opening editable
 routes restores their stops and settings; press **Plan** to rebuild paths with
@@ -292,7 +296,7 @@ sends no routing requests. Viewed tiles use a browser HTTP disk cache (up to 256
 `$XDG_CACHE_HOME/locus-linux/map` (default `~/.cache/locus-linux/map`),
 respecting server expiry and revalidation headers. Revisiting cached areas can
 avoid downloading them again, including after relaunch. Demo mode uses a separate
-cache. Delete that directory while Locus is closed to clear it. No autocomplete,
+cache. Delete that directory while Exora is closed to clear it. No autocomplete,
 bulk tile downloading, prefetch or guaranteed offline maps are implemented. The night map styles the same tiles locally.
 
 Photon and Valhalla public demos offer no availability guarantee. Requests are
@@ -309,7 +313,7 @@ State stays under `$XDG_STATE_HOME/locus-linux`, default `~/.local/state/locus-l
 phone ID, last requested target and transport for recovery. Files are mode 0600.
 Demo mode uses separate files. These personal files are never included in Git.
 
-If favorites/settings cannot be read or validated, Locus opens with defaults and
+If favorites/settings cannot be read or validated, Exora opens with defaults and
 reports the problem. The original `places.json` is preserved and saving places
 or settings is blocked until it is repaired and the app is reopened. Failed
 saves retain the previous in-memory and on-disk data. New save files are written
@@ -371,8 +375,8 @@ readback, physical unplug recovery and Wi-Fi set/refresh/clear remain pending.
 The map keeps browser page magnification disabled; touchpad pinch and the +/−
 buttons change Leaflet's geographic zoom instead. Panel and splitter resizing
 updates the map viewport without changing its geographic center. Browser startup
-changes require reopening Locus; reloading the map alone does not restart its
-browser process. Resolve any active iPhone session before closing Locus.
+changes require reopening Exora; reloading the map alone does not restart its
+browser process. Resolve any active iPhone session before closing Exora.
 
 Run `QT_QPA_PLATFORM=offscreen .venv/bin/python tests/smoke_map_viewport.py`
 from `linux/` to check map resizing, visible controls and touchpad zoom with
