@@ -14,6 +14,7 @@ from .theme import apply_theme
 from .units import to_mph, to_kph, speed_text
 from .planning import RoutePlan
 from .activation import activate_existing, listen_for_activation, opening_geometry
+from .map_profile import configure_map_browser
 
 
 from .worker import Worker as Worker, state_directory as state_directory
@@ -273,6 +274,7 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
 
 
 def main():
+    configure_map_browser()
     parser = argparse.ArgumentParser(description="Locus native Linux desktop")
     parser.add_argument("--demo", action="store_true", help="Use fake hardware; sends no phone commands")
     parser.add_argument("--install-launcher", action="store_true", help="Install an application-menu entry for this environment")

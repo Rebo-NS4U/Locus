@@ -1,4 +1,10 @@
 const map = L.map('map', {worldCopyJump: true, doubleClickZoom: false}).setView([40.7128, -74.006], 16);
+// Splitter changes and hidden inspector pages can resize the map without a
+// window resize. Keep Leaflet's cached viewport aligned with its actual cell.
+const mapResizeObserver = new ResizeObserver(() => {
+  map.invalidateSize({animate: false, debounceMoveend: true});
+});
+mapResizeObserver.observe(map.getContainer());
 const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);

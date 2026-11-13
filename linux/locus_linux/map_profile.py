@@ -1,9 +1,18 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """A bounded browser HTTP cache for tiles actually viewed by the user."""
 import os
+import shlex
 from pathlib import Path
 
 from PySide6.QtWebEngineCore import QWebEngineProfile
+
+
+def configure_map_browser():
+    # Leaflet owns geographic zoom. Chromium's compositor pinch instead
+    # magnifies/crops the whole page, including its fixed map controls.
+    flags = os.environ.get('QTWEBENGINE_CHROMIUM_FLAGS', '')
+    if '--disable-pinch' not in shlex.split(flags):
+        os.environ['QTWEBENGINE_CHROMIUM_FLAGS'] = (flags + ' --disable-pinch').strip()
 
 
 def create_map_profile(parent, *, demo=False):

@@ -366,6 +366,18 @@ rootless DVT connection, repeated set acknowledgements, joystick/route movement
 commands, pause/resume/loop and clear/cleanup passed. Independent phone-app GPS
 readback, physical unplug recovery and Wi-Fi set/refresh/clear remain pending.
 
+## Map rendering
+
+The map keeps browser page magnification disabled; touchpad pinch and the +/−
+buttons change Leaflet's geographic zoom instead. Panel and splitter resizing
+updates the map viewport without changing its geographic center. Browser startup
+changes require reopening Locus; reloading the map alone does not restart its
+browser process. Resolve any active iPhone session before closing Locus.
+
+Run `QT_QPA_PLATFORM=offscreen .venv/bin/python tests/smoke_map_viewport.py`
+from `linux/` to check map resizing, visible controls and touchpad zoom with
+external tile requests blocked and no phone connection.
+
 ## Implementation and licenses
 
 The original Swift app remains under the root MIT license. The Linux code is
