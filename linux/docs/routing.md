@@ -187,6 +187,20 @@ and are sent nowhere unless their segments are subsequently planned online.
 profiles or speed policies. Imported GPX plays at the global Move speed; use its
 GPX export to preserve it rather than saving an endpoint-only route project.
 
+To start partway through a planned route, select a stop card and press
+**Start from selected stop** beside its settings. Exora sets the phone to that
+stop and leaves immediately, skipping earlier stops and that stop's wait rule.
+Later departure rules and travel settings still apply. With **Show return stops**
+enabled, a return card starts that return visit. Starting at the final stop holds
+there; **Loop route** continues by repeating the full trip after the finish.
+Ordinary **Start** still begins at the first stop and honors its departure rule.
+Imported GPX tracks use ordinary Start because they have no editable stop cards.
+
+The playback bar's **Clear route** button removes the working route, including
+an imported GPX. During playback it first holds the current simulated location.
+Saved library routes remain available. This does not restore the phone's real
+location; use **Restore** for that.
+
 Provider references:
 
 - [Valhalla routing preferences](https://valhalla.github.io/valhalla/api/route/api-reference/)

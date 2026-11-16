@@ -82,19 +82,29 @@ class Session:
             self.speed, self.variation, self.reconnect = speed, bool(variation), bool(reconnect)
         return "Movement settings updated."
 
-    async def start_route(self, device, points, loop=False, profile=None):
+    async def start_route(self, device, points, loop=False, profile=None, start_index=None):
         from .routes import Route
         route = Route(points, **(profile or {}))
-        await self.apply(device, *route.points[0])
+        if start_index is not None and (type(start_index) is not int or not 0 <= start_index < len(route.points)):
+            raise ValueError('Choose a valid route starting point')
+        first = start_index if start_index is not None else 0
+        progress = route.lengths[first]
+        await self.apply(device, *route.points[first])
         async with self.lock:
-            self.route, self.progress, self.loop_route = route, 0, bool(loop)
+            self.route, self.progress, self.loop_route = route, progress, bool(loop)
             self.mode, self.paused = "route", False
-            self.motion_speed = 0 if not route.speeds or route.motorized[0] or self.variation else route.speeds[0]
+            edge = route.edge_at(progress)
+            self.motion_speed = 0 if not route.speeds or route.motorized[edge] or self.variation else route.speeds[edge]
             self.variation_factor, self.variation_target, self.variation_remaining = 1., 1., 0.
             from .traffic import TrafficSchedule
-            self.traffic = TrafficSchedule(route.stops, self.traffic_enabled, self.red_probability, self.traffic_rng)
+            self.traffic = TrafficSchedule(route.stops, self.traffic_enabled, self.red_probability, self.traffic_rng,
+                                           after=progress + .01 if start_index is not None else -1)
             from .departures import DepartureSchedule
             self.departures = DepartureSchedule(route.planned_stops, self.wall_clock)
+            if start_index is not None:
+                # Starting explicitly at a stop leaves immediately; later rules remain armed.
+                while self.departures.upcoming and self.departures.upcoming['distance'] <= progress + 1e-8:
+                    self.departures.release()
             if self.departures.upcoming and self.departures.upcoming['distance'] <= .01:
                 self.departures.arrive()
                 self.motion_speed = 0

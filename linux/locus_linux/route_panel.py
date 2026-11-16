@@ -147,6 +147,8 @@ class RoutePanelMixin:
         self.selection_context.setObjectName('sectionTitle')
         self.selection_context.setWordWrap(True)
         details_box.addWidget(self.selection_context)
+        self.button('Start from selected stop', self.start_selected_stop, details_box, True).setToolTip(
+            'Set the phone to the selected stop and leave immediately. Later stop rules still apply; loops repeat the whole route.')
         details_scroll = QScrollArea()
         details_scroll.setWidgetResizable(True)
         details_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -306,6 +308,8 @@ class RoutePanelMixin:
         self.button('Resume', lambda: self.request('control', 'resume'), row, True)
         self.stop_route_button = self.button('Stop here', lambda: self.request('stop_here'), row, True)
         self.stop_route_button.setToolTip('Keep the current simulated location and clear the route.')
+        self.button('Clear route', self.clear_route, row).setToolTip(
+            'Hold the current location and clear the working route. Saved library routes are kept.')
         self.continue_stop = self.button('Continue from stop', lambda: self.request('control', 'depart'), row, True)
         self.continue_stop.hide()
         self.button('Restore', lambda: self.perform('restore'), row, True).setToolTip('Clear simulated location and close the phone connection')

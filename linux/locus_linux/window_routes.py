@@ -68,7 +68,12 @@ class RouteEditorMixin:
             self.route_list.setCurrentRow(target)
 
     def clear_route(self):
+        if self.motion.get('mode') == 'route':
+            self.request('stop_here')
+            return
         if self.editable_route():
+            self.active_route_id = None
+            self.route_title.clear()
             self.route_plan.reset([])
             self.stops_changed()
 
@@ -356,7 +361,19 @@ class RouteEditorMixin:
         if self.route_plan.there_and_back:
             self.stops_changed()
 
-    def start_route(self):
+    def start_selected_stop(self):
+        row = self.route_list.currentRow()
+        if not self.imported_track and len(self.stops) == 1 and row == 0:
+            self.start_route()
+            return
+        legs = (self.route_profile or {}).get('legs', [])
+        if self.imported_track or row < 0 or not legs or row > len(legs):
+            self.status.setText('Select a stop on a planned route before starting from it.')
+            return
+        index = legs[row]['first'] if row < len(legs) else legs[-1]['last']
+        self.start_route(start_index=index)
+
+    def start_route(self, *, start_index=None):
         if not self.imported_track and len(self.stops) == 1:
             self.select_coordinates(*self.stops[0])
             self.perform('apply')
@@ -365,4 +382,4 @@ class RouteEditorMixin:
             self.status.setText("Plan the segments, or import a GPX path, before starting a route.")
             return
         self.configure_motion()
-        self.request("start_route", self.devices.currentData(), self.route_points.copy(), self.loop_route.isChecked(), self.route_profile)
+        self.request("start_route", self.devices.currentData(), self.route_points.copy(), self.loop_route.isChecked(), self.route_profile, start_index)

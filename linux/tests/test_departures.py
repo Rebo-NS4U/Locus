@@ -79,6 +79,37 @@ class PlannedStopPlaybackTests(unittest.IsolatedAsyncioTestCase):
     async def start(self, mode, index=1, loop=False, **values):
         await self.session.start_route('phone', self.points, loop, {'planned_stops': [{'index': index, 'stop': index + 1, 'mode': mode, **values}]})
 
+    async def test_selected_start_skips_earlier_waits_and_keeps_later_rules(self):
+        profile = {'planned_stops': [
+            {'index': i, 'stop': i + 1, 'mode': 'manual'} for i in range(3)]}
+        await self.session.start_route('phone', self.points, False, profile, 1)
+        self.assertEqual(self.session.target, self.points[1])
+        self.assertAlmostEqual(self.session.progress, self.session.route.lengths[1])
+        self.assertIsNone(self.session.departures.waiting)
+        await self.session.tick(1)
+        self.assertEqual(self.session.target, self.points[2])
+        self.assertEqual(self.session.departures.waiting['stop'], 3)
+
+    async def test_selected_return_visit_keeps_full_route_and_loop(self):
+        points = self.points + self.points[-2::-1]
+        await self.session.start_route('phone', points, True, None, 3)
+        self.assertEqual(self.session.target, points[3])
+        self.assertEqual(self.session.route.points, points)
+        self.assertAlmostEqual(self.session.progress, self.session.route.lengths[3])
+        await self.session.tick(1)
+        await self.session.tick(.01)
+        self.assertLess(self.session.progress, self.session.route.lengths[1])
+
+    async def test_selected_final_stop_holds_and_invalid_start_never_applies(self):
+        for index in (-1, 3, True, 1.5):
+            with self.assertRaises(ValueError):
+                await self.session.start_route('phone', self.points, start_index=index)
+        self.assertEqual(self.transport.calls, [])
+        await self.session.start_route('phone', self.points, start_index=2)
+        await self.session.tick(1)
+        self.assertEqual(self.session.target, self.points[2])
+        self.assertTrue(self.session.paused)
+
     async def test_manual_wait_lands_exactly_and_refreshes_until_continue(self):
         await self.start('manual')
         await self.session.tick(1)
