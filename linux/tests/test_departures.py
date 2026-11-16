@@ -276,9 +276,38 @@ class PlannedStopPlaybackTests(unittest.IsolatedAsyncioTestCase):
         await self.session.tick(1)
         await self.session.tick(10)
         self.assertTrue(self.session.paused)
+        self.assertIsNotNone(self.session.departures.waiting)
+        self.transport.fail_set = True
+        await self.session.tick(1)
         with self.assertRaises(ValueError):
             await self.session.control('depart')
-        await self.session.control('resume')
+        self.transport.fail_set = False
+        self.session.reconnect = True
+        await self.session.tick(1, self.session.next_retry + 1)
         await self.session.control('depart')
         await self.session.tick(1)
         self.assertTrue(self.session.paused)
+
+    async def test_leave_now_overrides_any_wait_and_resumes_without_changing_later_rules(self):
+        for mode, values in [('manual', {}), ('timer', {'seconds': 600}),
+                             ('clock', {'time': '16:00'})]:
+            for paused in (False, True):
+                with self.subTest(mode=mode, paused=paused):
+                    profile = {'planned_stops': [
+                        {'index': 0, 'stop': 1, 'mode': mode, **values},
+                        {'index': 1, 'stop': 2, 'mode': 'manual'}]}
+                    await self.session.start_route('phone', self.points, False, profile)
+                    if paused:
+                        await self.session.control('pause')
+                    await self.session.control('depart')
+                    self.assertFalse(self.session.paused)
+                    self.assertIsNone(self.session.departures.waiting)
+                    await self.session.tick(1)
+                    self.assertEqual(self.session.target, self.points[1])
+                    self.assertEqual(self.session.departures.waiting['stop'], 2)
+                    self.assertEqual(profile['planned_stops'][0]['mode'], mode)
+
+    async def test_leave_now_requires_a_planned_wait(self):
+        await self.session.start_route('phone', self.points)
+        with self.assertRaisesRegex(ValueError, 'not waiting'):
+            await self.session.control('depart')

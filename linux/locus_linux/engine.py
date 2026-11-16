@@ -129,11 +129,10 @@ class Session:
             if action == 'depart':
                 if self.mode != 'route' or not self.departures or not self.departures.waiting:
                     raise ValueError('The route is not waiting at a planned stop')
-                if self.paused or self.target is None:
-                    raise ValueError('Reconnect and resume the route before continuing')
-                if self.departures.waiting['mode'] != 'manual':
-                    raise ValueError('This stop leaves automatically when its timer or departure time is reached')
+                if self.target is None:
+                    raise ValueError('Reconnect the phone before leaving this stop')
                 self.departures.release()
+                self.paused = False
             elif action == "hold":
                 self.mode, self.vector = "fixed", (0, 0)
                 self.motion_speed = 0

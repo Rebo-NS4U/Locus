@@ -194,6 +194,11 @@ Later departure rules and travel settings still apply. With **Show return stops*
 enabled, a return card starts that return visit. Starting at the final stop holds
 there; **Loop route** continues by repeating the full trip after the finish.
 Ordinary **Start** still begins at the first stop and honors its departure rule.
+While waiting at any planned stop, **Leave stop now** beside **Resume** leaves
+immediately, overriding that stop's timer, clock departure or manual wait.
+It also resumes a paused route. Later stops keep their saved rules. Reconnect
+the phone first if the connection was lost. **Resume** alone keeps the current
+stop's departure rule in effect.
 Imported GPX tracks use ordinary Start because they have no editable stop cards.
 
 The **Clear route** button beside the route name removes the working route, including

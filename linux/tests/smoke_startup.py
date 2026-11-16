@@ -42,6 +42,23 @@ def check_launch():
         window.motion = {'mode': 'route'}
         buttons['Clear route'].click()
         request.assert_called_with('stop_here')
+        window.busy = False
+        state = {'connected': True, 'paused': True, 'position': (0, 0),
+                 'progress': 0, 'total': 1, 'mode': 'route'}
+        for mode in ('manual', 'timer', 'clock'):
+            state['planned_stop'] = {'stop': 1, 'distance': 0, 'mode': mode,
+                                     'remaining': 600, 'deadline': 1800000000}
+            window.motion_changed(state)
+            assert not window.continue_stop.isHidden()
+            assert window.continue_stop.isEnabled()
+            window.continue_stop.click()
+            request.assert_called_with('control', 'depart')
+        state['connected'] = False
+        window.motion_changed(state)
+        assert not window.continue_stop.isEnabled()
+        state['planned_stop'] = None
+        window.motion_changed(state)
+        assert window.continue_stop.isHidden()
     window.motion = {}
     window.busy = False
     buttons['Clear route'].click()

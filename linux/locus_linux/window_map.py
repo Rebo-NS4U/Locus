@@ -22,18 +22,18 @@ class MapInteractionMixin:
         self.js("setAcknowledged", state["position"], state["connected"])
         self.progress.setText(f"{'Paused / holding' if state['paused'] else 'Following route'} · {state['progress'] / METRES_PER_MILE:.2f} / {state['total'] / METRES_PER_MILE:.2f} mi · {to_mph(state.get('speed_kph', 0)):.1f} mph\n{speed_text(state.get('speed_source', ''))}" if state["total"] else "Not following a route")
         planned = state.get('planned_stop')
-        self.continue_stop.setVisible(bool(planned and planned['mode'] == 'manual'))
-        self.continue_stop.setEnabled(bool(planned and not state['paused'] and state['connected'] and not self.busy))
+        self.continue_stop.setVisible(bool(planned))
+        self.continue_stop.setEnabled(bool(planned and state['connected'] and not self.busy))
         if planned:
             label = f"At stop {planned['stop']} · "
             if planned['mode'] == 'manual':
-                label += 'waiting for Continue'
+                label += 'waiting for Leave stop now'
             elif planned['mode'] == 'timer':
                 label += f"{planned['remaining']:.0f}s remaining"
             else:
                 label += 'departure ' + datetime.fromtimestamp(planned['deadline']).strftime('%a %I:%M %p')
             if state['paused']:
-                label += ' · Paused — Resume required'
+                label += ' · Paused — Resume or Leave stop now'
             self.progress.setText(label)
         if state.get('traffic_stop'):
             stop = state['traffic_stop']
