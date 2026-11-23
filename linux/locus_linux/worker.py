@@ -9,6 +9,9 @@ from .device import IPhoneTransport
 from .services import Services
 
 
+OPERATION_TIMEOUT_SECONDS = 180
+
+
 def state_directory():
     return Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "locus-linux"
 
@@ -16,6 +19,7 @@ def state_directory():
 class Worker(QThread):
     finished_operation = Signal(str, object)
     failed = Signal(str, str)
+    planning_progress = Signal(int, int)
     interrupted = Signal(str)
     state_changed = Signal(object)
     ready = Signal()
@@ -45,8 +49,9 @@ class Worker(QThread):
 
     def submit(self, operation, *args):
         async def execute():
+            segment = None
             try:
-                async with self.operation_lock, asyncio.timeout(180):
+                async with self.operation_lock, asyncio.timeout(OPERATION_TIMEOUT_SECONDS) as deadline:
                     if operation == "discover":
                         result = await self.transport.discover()
                     elif operation in ("prepare", "enable_wifi", "set_mode"):
@@ -55,11 +60,22 @@ class Worker(QThread):
                         result = await getattr(self.transport, operation)(*args)
                     elif operation in ("apply", "restore", "configure", "configure_traffic", "start_route", "control", "joystick", "stop_here"):
                         result = await getattr(self.session, operation)(*args)
-                    elif operation in ("search", "mixed_route"):
-                        result = await getattr(self.services, operation)(*args)
+                    elif operation == "mixed_route":
+                        def progress(number, total):
+                            nonlocal segment
+                            segment = number
+                            deadline.reschedule(self.loop.time() + OPERATION_TIMEOUT_SECONDS)
+                            self.planning_progress.emit(number, total)
+
+                        result = await self.services.mixed_route(*args, progress=progress)
+                    elif operation == "search":
+                        result = await self.services.search(*args)
                     else:
                         raise ValueError("Unknown operation")
                 self.finished_operation.emit(operation, result)
+            except TimeoutError as error:
+                message = f"Planning segment {segment} timed out." if segment else str(error) or "Operation timed out."
+                self.failed.emit(operation, message)
             except Exception as error:
                 self.failed.emit(operation, str(error) or type(error).__name__)
         asyncio.run_coroutine_threadsafe(execute(), self.loop)

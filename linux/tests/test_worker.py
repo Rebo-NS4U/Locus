@@ -47,3 +47,35 @@ class WorkerRecoveryTests(unittest.TestCase):
             self.assertIsNone(worker.recovery_error)
             self.assertEqual(worker.transport.mode, 'wifi')
             self.assertIsNone(worker.session.target)
+
+
+class WorkerPlanningTests(unittest.IsolatedAsyncioTestCase):
+    async def test_slow_round_trip_renews_deadline_for_each_segment(self):
+        from locus_linux.services import Services
+
+        worker = Worker(True)
+        worker.loop = asyncio.get_running_loop()
+        worker.operation_lock = asyncio.Lock()
+        worker.services = Services()
+        finished = worker.loop.create_future()
+        worker.finished_operation.connect(lambda _, result: finished.set_result(result))
+        worker.failed.connect(lambda _, message: finished.set_exception(RuntimeError(message)))
+        progress = []
+        worker.planning_progress.connect(lambda n, total: progress.append((n, total)))
+        now = worker.loop.time()
+
+        async def slow_route(points, *args):
+            nonlocal now
+            now += 100
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            return [{'points': points}]
+
+        worker.services.route = slow_route
+        leg = {'start': (0, 0), 'end': (0, .001), 'spec': {'profile': 'cycle_roads'}}
+        with patch.object(worker.loop, 'time', side_effect=lambda: now):
+            worker.submit('mixed_route', [leg], 'https://example.org/route',
+                          'https://example.org/overpass', False, True)
+            result = await finished
+        self.assertEqual(len(result), 2)
+        self.assertEqual(progress, [(1, 2), (2, 2)])

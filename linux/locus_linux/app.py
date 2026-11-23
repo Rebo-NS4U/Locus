@@ -76,6 +76,7 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
         self.worker.ready.connect(self.started)
         self.worker.finished_operation.connect(self.completed)
         self.worker.failed.connect(self.failure)
+        self.worker.planning_progress.connect(self.show_planning_progress)
         self.worker.interrupted.connect(self.interrupted)
         self.worker.state_changed.connect(self.motion_changed)
         self.worker.finished.connect(self.close)
@@ -153,6 +154,9 @@ class Window(WindowUiMixin, RouteEditorMixin, RouteLibraryMixin, MapInteractionM
         self.enable(False)
         self.status.setText("Working…" + (" Unlock the phone and accept Trust if prompted. First preparation downloads Apple's developer image." if operation == "prepare" else ""))
         self.worker.submit(operation, *args)
+
+    def show_planning_progress(self, number, total):
+        self.status.setText(f"Planning segment {number} of {total}…")
 
     def perform(self, operation):
         args = [] if operation == "discover" else [self.devices.currentData()]

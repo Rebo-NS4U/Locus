@@ -253,7 +253,7 @@ class Services:
         if prefix or suffix:
             option['garage_warning'] = 'Mapped vehicle access roads; movement within the garage is approximate (floors and ramps are not modeled).'
 
-    async def mixed_route(self, legs, url=VALHALLA, overpass_url=OVERPASS, include_stops=True, there_and_back=False):
+    async def mixed_route(self, legs, url=VALHALLA, overpass_url=OVERPASS, include_stops=True, there_and_back=False, *, progress=None):
         from .planning import specification, PROFILES, MAX_PINS, SHORT_WALK_METRES
         if not 1 <= len(legs) < MAX_PINS:
             raise ValueError(f"A mixed route needs 2–{MAX_PINS} main pins")
@@ -270,6 +270,8 @@ class Services:
                           for start, end, spec in reversed(validated)]
         result = []
         for number, (start, end, spec) in enumerate(validated, 1):
+            if progress is not None:
+                progress(number, len(validated))
             cache_key = json.dumps([start, end, spec, url, overpass_url, include_stops], sort_keys=True)
             cached = self.plan_cache.get(cache_key)
             if cached and time.monotonic() - cached[0] < 300:
